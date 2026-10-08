@@ -133,8 +133,7 @@ function PhotoField() {
             )}
           </div>
           <span className="field-hint">
-            Printed at the top right of the CV, cropped to passport shape: use a head-and-shoulders photo. Expected in some countries (e.g. Germany, Austria,
-            Switzerland, much of the Middle East and Asia); leave it out for the UK, Ireland, the US and Canada.
+            Printed at the top right of the CV, cropped to passport shape: use a head-and-shoulders photo.
           </span>
         </div>
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
@@ -192,6 +191,7 @@ export function AddSection() {
   const { cv, mutate } = useStore()
   const [open, setOpen] = useState(false)
   const present = new Set(cv.sections.map((s) => s.type))
+  const shown = new Set(cv.sections.filter((s) => s.visible).map((s) => s.type))
 
   const add = (type: SectionType) => {
     const s = newSection(type)
@@ -222,7 +222,7 @@ export function AddSection() {
                 </span>
                 <span>
                   <strong>{def.label}</strong>
-                  <small>{used ? 'Already in your CV' : def.description}</small>
+                  <small>{!used ? def.description : shown.has(t) ? 'Already in your CV' : 'Already in your CV (hidden)'}</small>
                 </span>
               </button>
             )

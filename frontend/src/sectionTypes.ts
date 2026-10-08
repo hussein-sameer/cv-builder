@@ -39,6 +39,7 @@ export interface SectionTypeDef {
   kind: SectionKind
   fields: FieldSpec[]
   addLabel: string
+  /** more than one section of this type per CV: only the custom ones, every other type holds all its entries in one section */
   multiple: boolean
   aiBullets?: boolean
   tip?: string
@@ -69,7 +70,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     icon: Briefcase,
     kind: 'entries',
     addLabel: 'position',
-    multiple: true,
+    multiple: false,
     aiBullets: true,
     tip: 'Most recent first. Start bullets with an action verb and add numbers where you have them (team size, users, %, time saved).',
     fields: [
@@ -89,7 +90,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     icon: GraduationCap,
     kind: 'entries',
     addLabel: 'education',
-    multiple: true,
+    multiple: false,
     fields: [
       { key: 'title', label: 'Degree / qualification', kind: 'text', placeholder: 'B.Sc. Electronics & Communications Engineering' },
       { key: 'organization', label: 'School / university', kind: 'text', placeholder: 'University name' },
@@ -106,7 +107,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     icon: Wrench,
     kind: 'groups',
     addLabel: 'skill group',
-    multiple: true,
+    multiple: false,
     tip: 'Group skills (e.g. Programming, Networking, Tools). Only list what you can talk about in an interview.',
     fields: [
       { key: 'title', label: 'Category', kind: 'text', placeholder: 'e.g. Programming' },
