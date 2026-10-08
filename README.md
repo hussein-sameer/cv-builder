@@ -22,6 +22,17 @@ A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF*
 | Real text layer with embedded TrueType fonts (copy and paste works) | n/a | ✅ |
 | Standard headings ("Experience", "Education", "Skills"…) | ✅ | ✅ |
 | Unicode names (é, ł, ü…) | ✅ | ✅ |
+| No photo or other images | ✅ | ✅ |
+
+### Why there's no photo
+
+A photo isn't required by either layout, so CV Builder leaves it out on purpose:
+
+- **International (UK, Ireland, US, Canada, Australia):** leave it out. Employers avoid photos because they show age, race, sex and disability, which equality law (UK Equality Act 2010, US Title VII/ADEA/ADA) says must not affect hiring. Many recruiters in these countries are used to photo-free CVs, and some discard CVs that include one.
+- **EU / Europass:** the photo is an optional field. The EU's own Europass instructions say to add one only if the employer asks for it, and to leave out any field you don't need. Photos are still common in parts of Europe (for example Germany and Austria), but they're a custom, not a rule. In Germany an employer can't require one, because the General Equal Treatment Act (AGG) bars selecting people by the traits a photo shows.
+- **ATS:** parsers can't read anything in an image. A headshot near the top can also push your name out of the place where parsers look for it. Keeping images out of the file is part of what keeps this app's DOCX and PDF ATS-safe.
+
+If a job ad explicitly asks for a photo (common for some traditional employers in Germany, Austria and Switzerland), attach a separate professional headshot to the application, or add it to an exported DOCX by hand for that one application.
 
 ## Quick start with Docker (your own machine)
 

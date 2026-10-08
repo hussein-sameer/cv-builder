@@ -237,6 +237,11 @@ test in `tests/test_ai.py`.
 
 ## Known limitations / ideas
 
+- **No photo field, by design.** Neither layout requires one: international CVs (UK/US/IE/CA/AU) should
+  leave it out for anti-discrimination reasons, and the Europass photo is optional ("only if the employer
+  asks"). Images also break invariant 1 and give ATS parsers nothing to read. Don't add a photo field
+  unless the owner asks; the reasoning for users is in README → "Why there's no photo".
+
 - No email-based password reset (admin CLI only); no email verification on sign-up.
 - Login/sign-up throttles are in-memory, so they reset on restart and assume one instance.
 - No frontend unit or E2E tests in the repo yet (Playwright would fit).
