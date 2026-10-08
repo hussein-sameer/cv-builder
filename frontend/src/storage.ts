@@ -53,10 +53,10 @@ export function hasLocalCV(): boolean {
   return !!safeGet(localStorage, key('cv'))
 }
 
-/** Onboarding tour: 'pending' right after sign-up (survives a reload), 'done' once finished or skipped. */
+/** Guided tour without accounts (AUTH_ENABLED=false): 'done' once seen in this browser. With accounts it's on the account. */
 export const tourState = {
   get: () => safeGet(localStorage, key('tour')),
-  set: (v: 'pending' | 'done') => safeSet(localStorage, key('tour'), v),
+  set: (v: 'done') => safeSet(localStorage, key('tour'), v),
 }
 
 export const lastDoc = {

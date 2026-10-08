@@ -10,6 +10,10 @@ interface Session {
   authEnabled: boolean
   /** Call after the server session is gone (logout, account deleted, expiry). */
   signedOut: (opts?: { wipeLocal?: boolean; message?: string }) => void
+  /** Start the guided tour: a new account (any device), or first use in this browser without accounts. */
+  tourPending: boolean
+  /** The tour was finished or skipped: remember it on the account (or in this browser without accounts). */
+  finishTour: () => void
 }
 
 const SessionCtx = createContext<Session | null>(null)
@@ -50,6 +54,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
       .catch((e) => (e instanceof ApiError && e.status === 401 ? toAnon() : setState({ kind: 'error', message: (e as Error).message })))
   }, [toAnon])
 
+  const finishTour = useCallback(() => {
+    setState((s) => (s.kind === 'in' ? { ...s, user: { ...s.user, tourPending: false } } : s))
+    if (state.kind === 'in' && !state.authEnabled) tourState.set('done')
+    else void api.tourDone().catch(() => undefined) // best effort: at worst it's offered again next time
+  }, [state])
+
   const signedOut = useCallback(
     (opts: { wipeLocal?: boolean; message?: string } = {}) => {
       clearUserLocalData(opts.wipeLocal)
@@ -85,14 +95,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <AuthScreen
         config={state.config}
         notice={state.notice}
-        onIn={(u, isNew) => {
-          enter(u, true) // namespaces browser storage to this user first
-          if (isNew) tourState.set('pending') // new accounts get the guided tour once
-        }}
+        onIn={(u) => enter(u, true)}
       />
     )
   return (
-    <SessionCtx.Provider value={{ user: state.user, authEnabled: state.authEnabled, signedOut }}>
+    <SessionCtx.Provider
+      value={{
+        user: state.user,
+        authEnabled: state.authEnabled,
+        signedOut,
+        tourPending: state.authEnabled ? state.user.tourPending : tourState.get() === null,
+        finishTour,
+      }}
+    >
       <div key={state.user.id} style={{ display: 'contents' }}>
         {children}
       </div>
@@ -100,7 +115,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   )
 }
 
-function AuthScreen({ config, notice, onIn }: { config: AuthConfig; notice?: string; onIn: (u: SessionUser, isNew: boolean) => void }) {
+function AuthScreen({ config, notice, onIn }: { config: AuthConfig; notice?: string; onIn: (u: SessionUser) => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -115,7 +130,7 @@ function AuthScreen({ config, notice, onIn }: { config: AuthConfig; notice?: str
     if (mode === 'signup' && password.length < 8) return setError('Password must be at least 8 characters.')
     setBusy(true)
     try {
-      onIn(mode === 'login' ? await api.login(email, password) : await api.signup(email, password, name), mode === 'signup')
+      onIn(mode === 'login' ? await api.login(email, password) : await api.signup(email, password, name))
     } catch (err) {
       setError((err as Error).message)
     } finally {

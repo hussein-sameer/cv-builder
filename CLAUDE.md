@@ -140,7 +140,8 @@ numbers become `[X%]`-style placeholders that the ATS check flags.
 
 **Database.** `DATABASE_URL`, else `POSTGRES_URI` (Northflank addon), else SQLite at
 `DATA_DIR/cvs.db`. Tables: `users, sessions, cvs, ai_usage, ai_keys`. Schema is created idempotently on startup
-in `db.SCHEMA`; there is no migration framework.
+in `db.SCHEMA`; columns added to existing tables later are listed in `db.ADDED_COLUMNS`. There is no
+migration framework.
 
 ## Invariants — do not break these
 
@@ -202,9 +203,10 @@ method in `frontend/src/api.ts`, add tests using the `client` fixture (and `anon
 **Add an env setting:** field on `config.Settings` + `load_settings()`; read it as `config.settings.x`
 at call time (tests monkeypatch `config.settings`); document it in `.env.example` and `README.md`.
 
-**Add a DB table/column:** append to `db.SCHEMA` (idempotent) and, for columns on existing tables, add a
-guarded upgrade in `Database._init_schema` for SQLite *and* `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-for Postgres. Add the table to `TABLES` in `tests/conftest.py` so tests start clean.
+**Add a DB table/column:** append to `db.SCHEMA` (idempotent). For a column on an existing table, also put
+it in the `CREATE TABLE` and add `(table, column, definition)` to `db.ADDED_COLUMNS`: startup adds it with a
+`PRAGMA table_info` check on SQLite and `ADD COLUMN IF NOT EXISTS` on Postgres. Give it a default that is
+right for rows that already exist. Add new tables to `TABLES` in `tests/conftest.py` so tests start clean.
 
 **Add an AI provider:** adapter functions in `ai/providers.py` (`chat` + `list_models` branches,
 `PROVIDER_INFO` entry, default in `config.py`), extend `ProviderType` in both languages, add a mocked
@@ -259,9 +261,11 @@ test in `tests/test_ai.py`.
   (the ATS check says so for the International layout). The reasoning for users is in README → "Photo".
 - **Guided tour.** `components/Tour.tsx` highlights elements marked `data-tour="…"` (TopBar, CvSwitcher,
   App, EditorCards): keep those attributes when refactoring, and add one when a new feature deserves a step.
-  It starts once after sign-up (`AuthScreen` -> `tourState` 'pending' in storage.ts, per user, per browser)
-  or on first use with `AUTH_ENABLED=false`; finishing or skipping stores 'done'. Replay: ⋯ → Show tutorial,
-  or "Take the tour" on the welcome card. Steps whose target is hidden (e.g. the ATS check on a phone's
+  "Seen" is per account: `users.tour_pending` is 1 for accounts created by sign-up or `manage create-user`
+  (0 for accounts that existed before the tour), exposed as `user.tourPending` and cleared by
+  `POST /api/auth/tour-done` when the tour is finished or skipped, so it never repeats on another device.
+  With `AUTH_ENABLED=false` there's no account row, so the browser remembers it (`storage.tourState`).
+  Replay: ⋯ → Show tutorial, or "Take the tour" on the welcome card. Steps whose target is hidden (e.g. the ATS check on a phone's
   Edit tab) are dropped when marked `optional`.
 - **Phone and date of birth.** `personal.phone` stays one string ("+964 770…"); `PhoneInput` splits it
   with the prefix-free calling codes in `countries.ts` and never preselects a country. `dateOfBirth` is

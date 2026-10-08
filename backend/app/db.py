@@ -22,7 +22,8 @@ SCHEMA = [
         name          TEXT NOT NULL DEFAULT '',
         password_hash TEXT NOT NULL,
         created_at    TEXT NOT NULL,
-        last_login_at TEXT
+        last_login_at TEXT,
+        tour_pending  INTEGER NOT NULL DEFAULT 0
     )""",
     """CREATE TABLE IF NOT EXISTS sessions (
         token_hash TEXT PRIMARY KEY,
@@ -59,6 +60,9 @@ SCHEMA = [
     )""",
 ]
 POST_SCHEMA = ["CREATE INDEX IF NOT EXISTS cvs_user_idx ON cvs (user_id, updated_at)"]
+# Columns added after tables already existed in deployed databases: (table, column, definition).
+# Accounts created before the guided tour existed get 0 (no tour); sign-ups insert 1.
+ADDED_COLUMNS = [("users", "tour_pending", "INTEGER NOT NULL DEFAULT 0")]
 
 
 class Conn:
@@ -126,6 +130,12 @@ class Database:
                 cols = {r["name"] for r in c.all("PRAGMA table_info(cvs)")}
                 if "user_id" not in cols:
                     c.execute("ALTER TABLE cvs ADD COLUMN user_id TEXT")
+            for table, column, ddl in ADDED_COLUMNS:
+                if self.kind == "sqlite":
+                    if column not in {r["name"] for r in c.all(f"PRAGMA table_info({table})")}:
+                        c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+                else:
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {ddl}")
             for stmt in POST_SCHEMA:
                 c.execute(stmt)
 

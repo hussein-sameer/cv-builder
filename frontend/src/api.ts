@@ -62,6 +62,9 @@ export const api = {
   async logout(): Promise<void> {
     await post('/api/auth/logout', {})
   },
+  async tourDone(): Promise<void> {
+    await post('/api/auth/tour-done', {})
+  },
   async changePassword(current: string, next: string): Promise<void> {
     await post('/api/auth/password', { current, new: next })
   },

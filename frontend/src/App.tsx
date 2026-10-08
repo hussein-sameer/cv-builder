@@ -10,7 +10,6 @@ import { TopBar } from './components/TopBar'
 import { Tour } from './components/Tour'
 import { exampleCV } from './defaults'
 import { AuthGate, useSession } from './session'
-import { tourState } from './storage'
 import { StoreProvider, useStore } from './store'
 
 // pdf.js is large – load it after the editor is interactive
@@ -28,7 +27,7 @@ export default function App() {
 
 function Shell() {
   const { cv, replaceCV, undo, toasts, dismissToast, storageMode, createDoc, docId, openImport, tourOpen, openTour } = useStore()
-  const { authEnabled } = useSession()
+  const { tourPending } = useSession()
   const [pages, setPages] = useState<number | null>(null)
   const [tab, setTab] = useState<'edit' | 'preview'>('edit')
   const [atsOpen, setAtsOpen] = useState(false)
@@ -41,11 +40,9 @@ function Shell() {
   const isBlank =
     !cv.personal.fullName && cv.sections.every((s) => !s.content.trim() && s.items.every((it) => !it.title && !it.tags.length))
 
-  // Guided tour once after sign-up (or on first use without accounts), when the editor has loaded.
+  // Guided tour for a new account (or first use without accounts), once the editor has loaded.
   useEffect(() => {
-    if (storageMode === 'loading') return
-    const state = tourState.get()
-    if (state !== 'pending' && !(state === null && !authEnabled)) return
+    if (storageMode === 'loading' || !tourPending) return
     const t = setTimeout(() => openTour(true), 600)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps

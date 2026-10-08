@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useSession } from '../session'
 import { useStore } from '../store'
-import { tourState } from '../storage'
 
 interface Step {
   title: string
@@ -100,6 +100,7 @@ const PAD = 6
 
 function TourRun() {
   const { openTour } = useStore()
+  const { finishTour } = useSession()
   const [steps] = useState(() => STEPS.filter((s) => !s.optional || findTarget(s.targets)))
   const [index, setIndex] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
@@ -110,9 +111,9 @@ function TourRun() {
   const last = index === steps.length - 1
 
   const close = useCallback(() => {
-    tourState.set('done')
+    finishTour()
     openTour(false)
-  }, [openTour])
+  }, [finishTour, openTour])
   const next = useCallback(() => (last ? close() : setIndex((i) => i + 1)), [last, close])
   const back = useCallback(() => setIndex((i) => Math.max(0, i - 1)), [])
 
