@@ -6,7 +6,7 @@ A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF*
 
 - **Form editor.** Personal details (phone with a country-code picker, date of birth from a calendar, optional photo), then sections you add when you need them: experience, education, skills, languages, certifications, projects, courses, volunteering, awards, publications, interests, references, plus custom entry or free-text sections. You can rename, reorder, hide or delete any section.
 - **Live preview of the real PDF.** The server renders the PDF and the browser draws it with pdf.js, so the preview is the file you download. It also shows the page count.
-- **Two layouts.** *International ATS* (no personal data, `Mar 2021 – Present`) and *EU / UK* (nationality, work permit and driving licence block, `03/2021` dates first, CEFR language levels). Both are single-column and ATS-safe.
+- **Two layouts.** *International ATS* and *EU / UK* (nationality, work permit and driving licence block, CEFR language levels). Both are single-column and ATS-safe.
 - **Upload CV with AI.** Bring in an existing PDF or Word CV without retyping it. A three-step guide has you attach the file in any AI chat (ChatGPT, Claude, Gemini, Copilot…), paste an instruction the app gives you, then upload the `cv.json` the chat returns (or paste its reply). The instruction tells the AI to copy your wording exactly and invent nothing. The import is forgiving about date formats and section names, and lands as a new CV in your library. CV Builder never sees the original file.
 - **CV library.** Save as many CVs as you like (for example *Software Engineer* and *DevOps*). Use **Duplicate to tailor** to copy one, then set its **Target job** so the AI tailors the wording. Edits save automatically.
 - **AI writing.** "Generate with AI" for the summary. "Improve / Draft with AI" for each experience or project entry, with a review step before anything is applied. The prompts forbid inventing facts. Where a number would help, the AI leaves a `[X%]` placeholder, and the ATS check flags any left in.
@@ -31,13 +31,6 @@ A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF*
 ### Photo: optional, for the countries that expect one
 
 Upload a photo under **Personal details → Photo** and it's printed at the top right of both layouts (28 × 36 mm, cropped to passport proportions). With no photo, the files contain no images at all.
-
-- **Add one** where photos are customary: Germany, Austria and Switzerland, much of the Middle East (including the Gulf) and Asia, or whenever a job ad asks for it.
-- **Leave it out** for the UK, Ireland, the US, Canada and Australia. Employers there avoid photos because they show age, race, sex and disability, which equality law (UK Equality Act 2010, US Title VII/ADEA/ADA) says must not affect hiring, and some recruiters discard CVs that include one. The ATS check reminds you when the International layout prints a photo.
-- **Europass** treats the photo as optional: the EU's own instructions say to add one only if the employer asks. In Germany an employer can't require one (General Equal Treatment Act, AGG), even though many still expect it.
-- **ATS:** parsers can't read an image, but they don't need to: your name and contact details stay real text at the top of the file, and the photo sits beside them (floating in the DOCX, a separate column in the PDF) instead of above them.
-
-Tip: keep a copy without the photo (**Duplicate to tailor**) for applications to countries that don't expect one.
 
 ## Quick start with Docker (your own machine)
 
