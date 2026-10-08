@@ -123,14 +123,15 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   height: var(--topbar); flex: none; display: flex; align-items: center; gap: 16px; padding: 0 16px;
   background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20;
 }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; white-space: nowrap; flex: none; }
 .brand-cv { color: var(--primary-text); }
 .save-state { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: var(--muted); padding: 2px 8px; border-radius: 99px; background: var(--bg); }
 .save-state.ok { color: var(--ok); }
 .save-state.err { color: var(--danger); background: var(--danger-soft); }
 .save-state.warn { color: var(--warn); background: var(--warn-soft); }
 .cv-switcher { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.switcher-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); font-weight: 600; max-width: 240px; }
+.switcher-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); font-weight: 600; max-width: 240px; min-width: 0; }
+.switcher-btn svg, .save-state { flex: none; }
 .switcher-btn:hover:not(:disabled) { border-color: var(--primary-text); color: var(--primary-text); }
 .switcher-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .switcher-pop { width: 380px; max-width: calc(100vw - 24px); gap: 10px; }
@@ -148,7 +149,8 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .cv-rename { display: flex; gap: 4px; flex: 1; padding: 4px; }
 .switcher-actions { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
 .loading-cvs { text-align: center; padding: 40px 0; }
-.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
+.topbar-actions > *, .template-switch { flex: none; }
 .download-group { display: flex; gap: 6px; margin-left: 6px; }
 .collapse-all { color: var(--ink-2); margin-right: 2px; }
 .collapse-all:hover:not(:disabled) { color: var(--ink); }
@@ -191,7 +193,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .kbd { font-size: 10px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 4px; margin-left: 4px; font-weight: 500; }
 
 .segmented { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 2px; }
-.segmented button { border: 0; background: transparent; padding: 5px 12px; border-radius: 6px; font-weight: 550; color: var(--ink-2); text-transform: capitalize; }
+.segmented button { border: 0; background: transparent; padding: 5px 12px; border-radius: 6px; font-weight: 550; color: var(--ink-2); text-transform: capitalize; white-space: nowrap; }
 .segmented button.active { background: var(--panel); color: var(--primary-text); box-shadow: var(--shadow); }
 
 .ai-status { position: relative; }
@@ -400,6 +402,11 @@ select.input { padding-right: 4px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ------------------------------------------------------------- responsive */
+/* The top bar sheds labels step by step (1200, 1024), then puts the layout switch on its own row (880),
+   then becomes three rows on phones (720), so it never scrolls sideways. */
+@media (max-width: 1200px) {
+  .hide-lg { display: none; }
+}
 @media (max-width: 1100px) {
   .workspace { grid-template-columns: 1fr; }
   .workspace.show-edit .preview, .workspace.show-preview .editor { display: none; }
@@ -408,12 +415,29 @@ select.input { padding-right: 4px; }
   .mobile-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 8px; padding: 8px; background: transparent; font-weight: 600; color: var(--ink-2); }
   .mobile-tabs button.active { background: var(--primary-soft); color: var(--primary-text); }
 }
-@media (max-width: 720px) {
-  .topbar { gap: 8px; padding: 0 10px; height: auto; min-height: var(--topbar); flex-wrap: wrap; padding-block: 8px; }
-  .hide-sm, .brand-name, .cv-switcher .save-state { display: none; }
-  .switcher-btn { max-width: 150px; }
-  .template-switch { order: 3; width: 100%; }
+@media (max-width: 1024px) {
+  .topbar { gap: 10px; }
+  .brand-name, .save-text { display: none; }
+  .save-state { padding: 4px; }
+}
+@media (max-width: 880px) {
+  .topbar { height: auto; min-height: var(--topbar); flex-wrap: wrap; padding-block: 8px; row-gap: 8px; }
+  .template-switch { order: 1; flex-basis: 100%; }
   .template-switch button { flex: 1; }
+  .cv-switcher { flex: 1 1 0; } /* a long CV name shortens with "…" instead of pushing the tools to another row */
+}
+@media (max-width: 720px) {
+  /* top bar rows: [logo · CV · avatar] / [layout switch] / [tools … DOCX PDF] */
+  .topbar { padding-inline: 10px; gap: 6px; }
+  .topbar-actions { display: contents; }
+  .topbar-actions > * { order: 2; }
+  .topbar-actions > .account-anchor { order: 0; }
+  .download-group { margin-left: auto; }
+  .download-group .btn { padding: 0 10px; }
+  /* top-bar menus open full width under the bar instead of off the screen edge */
+  .topbar .popover-anchor { position: static; }
+  .topbar .popover { top: calc(100% + 4px); left: 8px; right: 8px; width: auto; min-width: 0; max-width: none; }
+  .hide-sm { display: none; }
   .grid { grid-template-columns: 1fr; }
   .field.span-2 { grid-column: auto; }
   .provider-tabs { grid-template-columns: 1fr 1fr; }

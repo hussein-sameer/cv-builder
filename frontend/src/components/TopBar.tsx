@@ -105,8 +105,8 @@ export function TopBar() {
         </button>
 
         <div className="popover-anchor">
-          <button type="button" className="btn ghost" data-popover-trigger onClick={() => setDesignOpen(!designOpen)} aria-expanded={designOpen}>
-            <Palette size={16} /> <span className="hide-sm">Design</span>
+          <button type="button" className="btn ghost" data-popover-trigger onClick={() => setDesignOpen(!designOpen)} aria-expanded={designOpen} aria-label="Design" title="Design">
+            <Palette size={16} /> <span className="hide-lg">Design</span>
           </button>
           <Popover open={designOpen} onClose={() => setDesignOpen(false)} className="design-pop">
             <label className="field">
@@ -160,8 +160,14 @@ export function TopBar() {
           </Popover>
         </div>
 
-        <button type="button" className={`btn ghost ai-status ${aiReady ? 'ready' : ''}`} onClick={() => openAISettings(true)} title="Connect an AI provider">
-          <Bot size={16} /> <span className="hide-sm">{aiReady ? aiLabel : 'Connect AI'}</span>
+        <button
+          type="button"
+          className={`btn ghost ai-status ${aiReady ? 'ready' : ''}`}
+          onClick={() => openAISettings(true)}
+          aria-label={aiReady ? `AI settings (${aiLabel})` : 'Connect AI'}
+          title={aiReady ? `AI: ${aiLabel}` : 'Connect an AI provider'}
+        >
+          <Bot size={16} /> <span className="hide-lg">{aiReady ? aiLabel : 'Connect AI'}</span>
           <span className="dot" />
         </button>
 
@@ -215,10 +221,10 @@ export function TopBar() {
 
         <div className="download-group">
           <button type="button" className="btn" onClick={() => download('docx')} disabled={!!busy}>
-            {busy === 'docx' ? <Spinner /> : <FileText size={16} />} DOCX
+            {busy === 'docx' ? <Spinner /> : <FileText size={16} className="hide-sm" />} DOCX
           </button>
           <button type="button" className="btn primary" onClick={() => download('pdf')} disabled={!!busy}>
-            {busy === 'pdf' ? <Spinner /> : <FileDown size={16} />} PDF
+            {busy === 'pdf' ? <Spinner /> : <FileDown size={16} className="hide-sm" />} PDF
           </button>
         </div>
         <AccountMenu />

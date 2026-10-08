@@ -77,7 +77,10 @@ frontend/src/
                        the lenient JSON -> CV importer (code fences, date formats, section aliases) used by every JSON import
   useAI.ts             Hook wrapping AI calls (readiness, busy flag, error toasts, low-quota notice)
   theme.ts             light/dark/system theme hook; index.html applies it before first paint
-  styles.css           ALL styling; design tokens at the top, dark theme overrides in :root[data-theme='dark']
+  styles.css           ALL styling; design tokens at the top, dark theme overrides in :root[data-theme='dark'].
+                       Responsive top bar: labels drop at 1200px (.hide-lg) and 1024px, the layout switch gets
+                       its own row at 880px, three rows + full-width menus at 720px. New top-bar buttons need
+                       an aria-label and must still fit at 360px
   ../public/           favicon.svg (tab icon, also the header/login mark), logo.svg (mark + wordmark),
                        favicon.ico + apple-touch-icon.png rendered from favicon.svg: regenerate both if it changes
                        and bump the ?v= in index.html so browsers drop the cached icon
@@ -213,7 +216,7 @@ test in `tests/test_ai.py`.
   `httpx.MockTransport` recorder; `server_key` gives the server an OpenAI key; SSRF tests monkeypatch
   `providers._host_ips`.
 - Frontend has no unit tests; `npm run build` (tsc) is the gate. For UI changes, describe what you
-  verified, and when possible check it in a browser (desktop and ~390 px wide, light and dark theme).
+  verified, and when possible check it in a browser (desktop, ~900 px and ~390 px wide, light and dark theme).
 
 ## Deployment (Northflank)
 

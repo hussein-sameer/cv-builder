@@ -177,12 +177,12 @@ function SaveIndicator({ state }: { state: 'saved' | 'saving' | 'error' }) {
   if (state === 'error')
     return (
       <span className="save-state err" title="Last save failed — kept in this browser, will retry">
-        <TriangleAlert size={12} /> Not saved
+        <TriangleAlert size={12} /> <span className="save-text">Not saved</span>
       </span>
     )
   return (
     <span className={`save-state ${state === 'saved' ? 'ok' : ''}`} title="Changes are saved automatically">
-      {state === 'saved' ? <Check size={12} /> : <Spinner size={10} />} {state === 'saved' ? 'Saved' : 'Saving'}
+      {state === 'saved' ? <Check size={12} /> : <Spinner size={10} />} <span className="save-text">{state === 'saved' ? 'Saved' : 'Saving'}</span>
     </span>
   )
 }
