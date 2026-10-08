@@ -39,7 +39,7 @@ Section types (pick the closest; anything that fits none goes into "custom" if i
 - "interests", "references", "customText": the text goes in "content".
 - "custom": items like experience: title, organization, location, startDate, endDate, current, description, bullets.
 
-Personal details: "headline" is the job title under my name, if there is one. Copy the phone number with its country code, and LinkedIn, GitHub and website addresses, as written. Fill "nationality", "dateOfBirth" (as YYYY-MM-DD), "workPermit" and "drivingLicence" only if my CV states them. Leave out any photo.
+Personal details: "headline" is the job title under my name, if there is one. Copy the phone number with its country code, and LinkedIn, GitHub and website addresses, as written. If my CV shows only a word such as "LinkedIn" or "GitHub" instead of the address, use the link behind that word if you can see it; otherwise leave that field empty. Fill "nationality", "dateOfBirth" (as YYYY-MM-DD), "workPermit" and "drivingLicence" only if my CV states them. Leave out any photo.
 
 Format (fill in my details; include only the sections my CV has, with as many items as needed):
 {

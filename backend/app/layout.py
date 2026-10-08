@@ -233,6 +233,27 @@ def _href(url: str) -> str:
     return "https://" + url
 
 
+_SITE_ONLY_RE = {"linkedin": re.compile(r"^linkedin(\.com)?(/in)?$", re.I), "github": re.compile(r"^github(\.com)?$", re.I)}
+_PROFILE_BASE = {"linkedin": "linkedin.com/in/", "github": "github.com/"}
+_HANDLE_RE = re.compile(r"^@?([A-Za-z0-9][A-Za-z0-9_-]*)$")
+_SCHEME_WWW_RE = re.compile(r"^(https?://)?(www\.)?", re.I)
+
+
+def profile_url(site: str, value: str) -> str:
+    """The LinkedIn or GitHub field as the address to print and link.
+
+    A bare handle ("alexmorgan", "@alexmorgan") becomes the profile URL. A value that only names the site
+    ("LinkedIn", "github.com", e.g. imported from a CV that showed just the word) gives "": its link would
+    open the site's home page, so it isn't printed and the editor asks for the profile address instead
+    (frontend `atsCheck.siteOnly` mirrors this check).
+    """
+    v = value.strip()
+    if _SITE_ONLY_RE[site].match(_SCHEME_WWW_RE.sub("", v).rstrip("/")):
+        return ""
+    m = _HANDLE_RE.match(v)
+    return _PROFILE_BASE[site] + m.group(1) if m else v
+
+
 _ISO_DAY_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 _LONE_DIAL_CODE_RE = re.compile(r"^\+\d{1,4}$")  # a country code picked but no number typed yet
 
@@ -360,7 +381,7 @@ def build_document(cv: CV) -> RenderDoc:
         contacts.append(Link(_clean(p.phone)))
     if p.email.strip():
         contacts.append(Link(p.email.strip(), "mailto:" + p.email.strip()))
-    for url in (p.linkedin, p.github, p.website):
+    for url in (profile_url("linkedin", p.linkedin), profile_url("github", p.github), p.website):
         if url.strip():
             contacts.append(Link(_display_url(url), _href(url)))
 

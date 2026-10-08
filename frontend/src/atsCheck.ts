@@ -15,6 +15,16 @@ const PRONOUN = /(^|\s)(I|my|me)\s/
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length
 
+/**
+ * A LinkedIn / GitHub value that only names the site ("LinkedIn", "github.com"): it would link to the site's
+ * home page, so the CV leaves it out. Mirrors backend layout.profile_url.
+ */
+export function siteOnly(site: 'linkedin' | 'github', value: string): boolean {
+  const v = value.trim().replace(/^(https?:\/\/)?(www\.)?/i, '').replace(/\/+$/, '')
+  return (site === 'linkedin' ? /^linkedin(\.com)?(\/in)?$/i : /^github(\.com)?$/i).test(v)
+}
+export const PROFILE_EXAMPLE = { linkedin: 'linkedin.com/in/yourname', github: 'github.com/yourname' }
+
 /** Lightweight checks for things that hurt ATS parsing or recruiter skimming. */
 export function atsCheck(cv: CV, pages: number | null): Issue[] {
   const issues: Issue[] = []
@@ -26,6 +36,9 @@ export function atsCheck(cv: CV, pages: number | null): Issue[] {
   else if (!EMAIL.test(p.email.trim())) add('error', 'Email address looks invalid.', 'personal')
   if (!p.phone.replace(/^\s*\+\d{1,4}\s*$/, '').trim()) add('warn', 'Add a phone number.', 'personal') // a code alone isn't printed
   if (!p.location.trim()) add('info', 'Add a location (city, country) — many ATS filter by it.', 'personal')
+  for (const [site, name] of [['linkedin', 'LinkedIn'], ['github', 'GitHub']] as const) {
+    if (siteOnly(site, p[site])) add('warn', `Your ${name} entry is just the site's name, so it isn't printed. Add your profile address (${PROFILE_EXAMPLE[site]}).`, 'personal')
+  }
   if (cv.design.template === 'international' && p.photo) {
     add('info', 'Your photo is printed. Leave it out for UK, Irish, US and Canadian employers; keep it where photos are expected (e.g. Germany, Austria, the Gulf).', 'personal')
   }
