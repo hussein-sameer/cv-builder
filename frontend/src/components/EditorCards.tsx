@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, Crosshair, Globe, ImageUp, Plus, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { PROFILE_EXAMPLE, siteOnly } from '../atsCheck'
 import { newSection } from '../defaults'
 import { photoFromFile } from '../photo'
 import { ADDABLE_ORDER, SECTION_TYPES } from '../sectionTypes'
@@ -19,6 +20,13 @@ export function PersonalCard() {
     if (cv.design.template === 'europass') setShowEU(true)
   }, [cv.design.template])
   const set = (k: keyof Personal) => (v: string) => mutate((d) => void (d.personal[k] = v))
+  // "LinkedIn" or "github.com" alone would link to the site's home page, so the CV leaves it out: say why
+  const profileHint = (site: 'linkedin' | 'github', name: string) =>
+    siteOnly(site, p[site]) ? (
+      <span className="hint-warn">
+        That's {name}'s home page, so it isn't printed. Paste your profile address, e.g. {PROFILE_EXAMPLE[site]}.
+      </span>
+    ) : undefined
 
   return (
     <section className="card" id="section-personal" data-tour="personal">
@@ -45,11 +53,11 @@ export function PersonalCard() {
           <Field label="Location">
             <TextInput value={p.location} onChange={set('location')} placeholder="Baghdad, Iraq" />
           </Field>
-          <Field label="LinkedIn">
-            <TextInput value={p.linkedin} onChange={set('linkedin')} placeholder="linkedin.com/in/yourname" />
+          <Field label="LinkedIn" hint={profileHint('linkedin', 'LinkedIn')}>
+            <TextInput value={p.linkedin} onChange={set('linkedin')} placeholder={PROFILE_EXAMPLE.linkedin} />
           </Field>
-          <Field label="GitHub / portfolio">
-            <TextInput value={p.github} onChange={set('github')} placeholder="github.com/yourname" />
+          <Field label="GitHub / portfolio" hint={profileHint('github', 'GitHub')}>
+            <TextInput value={p.github} onChange={set('github')} placeholder={PROFILE_EXAMPLE.github} />
           </Field>
           <Field label="Website (optional)">
             <TextInput value={p.website} onChange={set('website')} placeholder="yourname.dev" />

@@ -235,6 +235,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .field-label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
 .field-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .field-hint { font-size: 11.5px; color: var(--muted); }
+.hint-warn { color: var(--warn); }
 /* phone: a native <select> laid invisibly over a compact "🇮🇶 +964" label */
 .phone-input { display: flex; gap: 6px; }
 .phone-input .input { flex: 1; min-width: 0; }

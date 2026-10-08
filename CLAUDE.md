@@ -272,6 +272,9 @@ test in `tests/test_ai.py`.
   with the prefix-free calling codes in `countries.ts` and never preselects a country. `dateOfBirth` is
   ISO `YYYY-MM-DD` from a date picker, printed `DD/MM/YYYY` (`layout.format_birth_date`); older free-text
   values are converted by `defaults.toIsoDay` when possible and otherwise kept as typed.
+- **LinkedIn / GitHub links.** `layout.profile_url` turns a bare handle ("alexmorgan") into the profile URL and
+  drops a value that only names the site ("LinkedIn", "github.com"), whose link would open the site's home page.
+  `atsCheck.siteOnly` mirrors that check for the editor hint and the ATS warning: change both together.
 
 - No email-based password reset (admin CLI only); no email verification on sign-up.
 - Login/sign-up throttles are in-memory, so they reset on restart and assume one instance.

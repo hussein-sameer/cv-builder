@@ -9,7 +9,7 @@ from docx import Document
 from PIL import Image
 from pypdf import PdfReader
 
-from app.layout import build_document, format_birth_date, format_date, years_of_experience
+from app.layout import build_document, format_birth_date, format_date, profile_url, years_of_experience
 from app.models import CV
 
 SAMPLE = json.loads((Path(__file__).parent / "sample_cv.json").read_text())
@@ -166,3 +166,19 @@ def test_birth_date_and_phone_code_only():
     doc = build_document(CV.model_validate(data))
     assert ("Date of birth", "15/03/1990") in doc.details
     assert all(c.text != "+964" for c in doc.contacts)
+
+
+def test_profile_links_point_at_the_profile():
+    assert profile_url("linkedin", "alexmorgan") == "linkedin.com/in/alexmorgan"  # a bare handle
+    assert profile_url("github", "@alex-morgan") == "github.com/alex-morgan"
+    assert profile_url("linkedin", "https://www.linkedin.com/in/alexmorgan/") == "https://www.linkedin.com/in/alexmorgan/"
+    assert profile_url("github", "alexmorgan.dev") == "alexmorgan.dev"  # a portfolio site
+    # only the site's name: would link to its home page, so nothing is printed
+    for site, value in [("linkedin", "LinkedIn"), ("linkedin", "linkedin.com"), ("linkedin", "https://www.linkedin.com/in/"),
+                        ("github", "GitHub"), ("github", "www.github.com/"), ("github", "HTTPS://GitHub.com")]:
+        assert profile_url(site, value) == "", value
+
+    data = _cv()
+    data["personal"].update(linkedin="linkedin.com", github="alexmorgan", website="")
+    urls = [c.url for c in build_document(CV.model_validate(data)).contacts if c.url.startswith("https://")]
+    assert urls == ["https://github.com/alexmorgan"]
