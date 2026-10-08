@@ -56,11 +56,37 @@ export function emptyCV(): CV {
       dateOfBirth: '',
       workPermit: '',
       drivingLicence: '',
+      photo: '',
     },
     sections: (['summary', 'experience', 'education', 'skills'] as SectionType[]).map((t) => newSection(t)),
     design: { template: 'international', fontFamily: null, fontSize: 10.5, accentColor: '#1F3864', pageSize: 'A4' },
     target: { role: '', jobDescription: '' },
   }
+}
+
+const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+/**
+ * A typed date of birth -> "YYYY-MM-DD" for the date picker: "15/03/1990", "15.03.1990", "15 March 1990",
+ * "March 15, 1990". Numeric dates are read day first (the field used to ask for DD/MM/YYYY) unless that's
+ * impossible. Anything else is returned unchanged, so nothing typed earlier is lost.
+ */
+export function toIsoDay(value: string): string {
+  const v = String(value ?? '').trim()
+  const iso = (y: number, m: number, d: number) => {
+    const ok = m >= 1 && m <= 12 && d >= 1 && d <= new Date(y, m, 0).getDate()
+    return ok ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : v
+  }
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(v)
+  if (m) return iso(+m[1], +m[2], +m[3])
+  m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec(v)
+  if (m) return +m[1] <= 12 && +m[2] > 12 ? iso(+m[3], +m[1], +m[2]) : iso(+m[3], +m[2], +m[1])
+  const month = (name: string) => MONTH_NAMES.indexOf(name.slice(0, 3).toLowerCase()) + 1
+  m = /^(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]+)\.?,?\s+(\d{4})$/i.exec(v)
+  if (m && month(m[2])) return iso(+m[3], month(m[2]), +m[1])
+  m = /^([a-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/i.exec(v)
+  if (m && month(m[1])) return iso(+m[3], month(m[1]), +m[2])
+  return v
 }
 
 /** Fill in any missing keys so older saves / imported JSON keep working. */
@@ -78,7 +104,10 @@ export function normalizeCV(raw: unknown): CV {
         }))
     : base.sections
   return {
-    personal: { ...base.personal, ...(r.personal ?? {}) },
+    personal: (() => {
+      const personal = { ...base.personal, ...(r.personal ?? {}) }
+      return { ...personal, dateOfBirth: toIsoDay(personal.dateOfBirth) } // older saves typed it as text
+    })(),
     sections,
     design: { ...base.design, ...(r.design ?? {}) },
     target: { ...base.target, ...(r.target ?? {}) },
@@ -115,6 +144,7 @@ export function exampleCV(): CV {
       dateOfBirth: '',
       workPermit: 'Eligible to work in the UK; open to relocation within the EU',
       drivingLicence: 'B',
+      photo: '',
     },
     sections: [
       s('summary', {

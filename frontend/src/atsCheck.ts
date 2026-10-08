@@ -24,8 +24,11 @@ export function atsCheck(cv: CV, pages: number | null): Issue[] {
   if (!p.fullName.trim()) add('error', 'Add your full name.', 'personal')
   if (!p.email.trim()) add('error', 'Add an email address — ATS uses it to identify you.', 'personal')
   else if (!EMAIL.test(p.email.trim())) add('error', 'Email address looks invalid.', 'personal')
-  if (!p.phone.trim()) add('warn', 'Add a phone number.', 'personal')
+  if (!p.phone.replace(/^\s*\+\d{1,4}\s*$/, '').trim()) add('warn', 'Add a phone number.', 'personal') // a code alone isn't printed
   if (!p.location.trim()) add('info', 'Add a location (city, country) — many ATS filter by it.', 'personal')
+  if (cv.design.template === 'international' && p.photo) {
+    add('info', 'Your photo is printed. Leave it out for UK, Irish, US and Canadian employers; keep it where photos are expected (e.g. Germany, Austria, the Gulf).', 'personal')
+  }
   if (cv.design.template === 'international' && (p.dateOfBirth || p.nationality)) {
     add('info', 'Date of birth / nationality are hidden in the International layout (good practice for US/global roles).', 'personal')
   }

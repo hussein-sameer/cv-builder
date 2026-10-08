@@ -9,10 +9,15 @@ identical in content and order — which is what an ATS cares about.
 
 from __future__ import annotations
 
+import base64
+import io
 import re
 from dataclasses import dataclass, field
 from datetime import date
+from functools import lru_cache
 from typing import Literal
+
+from PIL import Image, ImageOps
 
 from .models import CV, Item, Section
 
@@ -52,7 +57,7 @@ TEMPLATES: dict[str, TemplateSpec] = {
     "international": TemplateSpec(
         key="international",
         name="International ATS",
-        description="Single column, standard headings, no photo or personal data. "
+        description="Single column, standard headings, no personal details such as date of birth. "
         "Safest choice for applicant tracking systems in the US, Gulf and most global employers.",
         default_font="Calibri",
         date_style="month_name",
@@ -164,6 +169,7 @@ class RenderDoc:
     font_size: float
     accent: str
     page_size: str
+    photo: bytes | None = None  # normalised JPEG, PHOTO_PX, or None
 
 
 # --------------------------------------------------------------------------- #
@@ -225,6 +231,48 @@ def _href(url: str) -> str:
     if url.startswith(("http://", "https://", "mailto:", "tel:")):
         return url
     return "https://" + url
+
+
+_ISO_DAY_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+_LONE_DIAL_CODE_RE = re.compile(r"^\+\d{1,4}$")  # a country code picked but no number typed yet
+
+
+def format_birth_date(value: str) -> str:
+    """'1990-03-15' (from the date picker) -> '15/03/1990', the European order; anything else as typed."""
+    m = _ISO_DAY_RE.match(value.strip())
+    return f"{m.group(3)}/{m.group(2)}/{m.group(1)}" if m else _clean(value)
+
+
+PHOTO_PX = (420, 540)  # 7:9, i.e. 35 x 45 mm passport proportions at ~300 dpi
+
+
+@lru_cache(maxsize=32)
+def photo_jpeg(data_url: str) -> bytes | None:
+    """Decode the photo data URL into a 7:9 JPEG both renderers embed; None if it isn't a usable image.
+
+    Cropping happens here as well as in the editor so an imported JSON with any image still prints
+    at the right size. Cached because the live preview re-renders the same photo on every keystroke.
+    """
+    if not data_url:
+        return None
+    try:
+        raw = base64.b64decode(data_url.split(",", 1)[1], validate=True)
+        with Image.open(io.BytesIO(raw)) as im:
+            if im.width * im.height > 40_000_000:  # refuse decompression bombs early
+                return None
+            im = ImageOps.exif_transpose(im)
+            if im.mode in ("RGBA", "LA", "P"):
+                im = im.convert("RGBA")
+                bg = Image.new("RGB", im.size, (255, 255, 255))
+                bg.paste(im, mask=im.getchannel("A"))
+                im = bg
+            # top-biased crop keeps the face in frame for tall photos
+            im = ImageOps.fit(im.convert("RGB"), PHOTO_PX, Image.Resampling.LANCZOS, centering=(0.5, 0.2))
+            out = io.BytesIO()
+            im.save(out, "JPEG", quality=88, optimize=True)
+            return out.getvalue()
+    except Exception:  # noqa: BLE001 - corrupt or unsupported image: print the CV without it
+        return None
 
 
 def heading_for(section: Section, spec: TemplateSpec) -> str:
@@ -308,7 +356,7 @@ def build_document(cv: CV) -> RenderDoc:
     contacts: list[Link] = []
     if p.location.strip():
         contacts.append(Link(_clean(p.location)))
-    if p.phone.strip():
+    if p.phone.strip() and not _LONE_DIAL_CODE_RE.match(p.phone.strip()):
         contacts.append(Link(_clean(p.phone)))
     if p.email.strip():
         contacts.append(Link(p.email.strip(), "mailto:" + p.email.strip()))
@@ -320,7 +368,7 @@ def build_document(cv: CV) -> RenderDoc:
     if spec.show_personal_details:
         for label, value in (
             ("Nationality", p.nationality),
-            ("Date of birth", p.dateOfBirth),
+            ("Date of birth", format_birth_date(p.dateOfBirth)),
             ("Work permit", p.workPermit),
             ("Driving licence", p.drivingLicence),
         ):
@@ -340,6 +388,7 @@ def build_document(cv: CV) -> RenderDoc:
         font_size=cv.design.fontSize,
         accent=cv.design.accentColor,
         page_size=cv.design.pageSize,
+        photo=photo_jpeg(p.photo),
     )
 
 

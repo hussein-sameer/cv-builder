@@ -1,10 +1,15 @@
-import { ChevronDown, ChevronRight, Crosshair, Globe, Plus, UserRound } from 'lucide-react'
+import { ChevronDown, ChevronRight, Crosshair, Globe, ImageUp, Plus, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { newSection } from '../defaults'
+import { photoFromFile } from '../photo'
 import { ADDABLE_ORDER, SECTION_TYPES } from '../sectionTypes'
 import { useStore } from '../store'
 import type { Personal, SectionType } from '../types'
 import { AutoTextArea, Field, TextInput } from './fields'
+import { PhoneInput } from './PhoneInput'
+import { Spinner } from './ui'
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
 
 export function PersonalCard() {
   const { cv, mutate } = useStore()
@@ -35,7 +40,7 @@ export function PersonalCard() {
             <TextInput type="email" value={p.email} onChange={set('email')} placeholder="name@example.com" />
           </Field>
           <Field label="Phone">
-            <TextInput type="tel" value={p.phone} onChange={set('phone')} placeholder="+964 770 000 0000" />
+            <PhoneInput value={p.phone} onChange={set('phone')} />
           </Field>
           <Field label="Location">
             <TextInput value={p.location} onChange={set('location')} placeholder="Baghdad, Iraq" />
@@ -49,6 +54,7 @@ export function PersonalCard() {
           <Field label="Website (optional)">
             <TextInput value={p.website} onChange={set('website')} placeholder="yourname.dev" />
           </Field>
+          <PhotoField />
         </div>
         <button type="button" className="disclosure" onClick={() => setShowEU(!showEU)} aria-expanded={showEU}>
           {showEU ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
@@ -66,13 +72,74 @@ export function PersonalCard() {
             <Field label="Driving licence">
               <TextInput value={p.drivingLicence} onChange={set('drivingLicence')} placeholder="B" />
             </Field>
-            <Field label="Date of birth (optional)" hint="Not recommended for UK/Ireland; still common in some EU countries.">
-              <TextInput value={p.dateOfBirth} onChange={set('dateOfBirth')} placeholder="DD/MM/YYYY" />
+            <Field
+              label="Date of birth (optional)"
+              hint={
+                p.dateOfBirth && !ISO_DAY.test(p.dateOfBirth)
+                  ? `Saved as “${p.dateOfBirth}”. Pick the date to replace it.`
+                  : 'Printed as DD/MM/YYYY. Not recommended for UK/Ireland; still common in some EU countries.'
+              }
+            >
+              <input
+                className="input"
+                type="date"
+                value={ISO_DAY.test(p.dateOfBirth) ? p.dateOfBirth : ''}
+                min="1900-01-01"
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => set('dateOfBirth')(e.target.value)}
+              />
             </Field>
           </div>
         )}
       </div>
     </section>
+  )
+}
+
+/** Optional photo: printed top right in both layouts; cropped to passport shape before it's stored. */
+function PhotoField() {
+  const { cv, mutate, toast } = useStore()
+  const photo = cv.personal.photo
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+
+  const upload = async (file: File) => {
+    if (fileRef.current) fileRef.current.value = '' // let the same file be picked again
+    setBusy(true)
+    try {
+      const url = await photoFromFile(file)
+      mutate((d) => void (d.personal.photo = url))
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="field span-2">
+      <span className="field-label">Photo (optional)</span>
+      <div className="photo-field">
+        <div className="photo-thumb">{photo ? <img src={photo} alt="Your CV photo" /> : <UserRound size={28} aria-hidden />}</div>
+        <div className="photo-actions">
+          <div className="input-with-btn">
+            <button type="button" className="btn sm" onClick={() => fileRef.current?.click()} disabled={busy}>
+              {busy ? <Spinner /> : <ImageUp size={14} />} {photo ? 'Change photo' : 'Upload photo'}
+            </button>
+            {photo && (
+              <button type="button" className="btn sm ghost" onClick={() => mutate((d) => void (d.personal.photo = ''))}>
+                <Trash2 size={14} /> Remove
+              </button>
+            )}
+          </div>
+          <span className="field-hint">
+            Printed at the top right of the CV, cropped to passport shape: use a head-and-shoulders photo. Expected in some countries (e.g. Germany, Austria,
+            Switzerland, much of the Middle East and Asia); leave it out for the UK, Ireland, the US and Canada.
+          </span>
+        </div>
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
+      </div>
+    </div>
   )
 }
 

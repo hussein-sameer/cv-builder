@@ -54,6 +54,8 @@ class Personal(_Base):
     dateOfBirth: str = Field(default="", max_length=50)
     workPermit: str = Field(default="", max_length=300)
     drivingLicence: str = Field(default="", max_length=100)
+    # Optional photo as a data URL (the editor sends a ~50 KB 7:9 JPEG). Printed top right in both layouts.
+    photo: str = Field(default="", max_length=1_500_000, pattern=r"^(data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2})?$")
 
 
 class Item(_Base):

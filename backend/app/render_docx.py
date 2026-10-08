@@ -2,7 +2,9 @@
 
 Rules followed: single column, no tables, no text boxes, nothing in
 headers/footers, real Word bullet lists, real "Heading 1" section headings,
-standard fonts, contact details in the body.
+standard fonts, contact details in the body. The only image is the optional
+photo: floated at the top right of the body, anchored to the name, with the
+text still flowing in one column.
 """
 
 from __future__ import annotations
@@ -12,13 +14,14 @@ import io
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
+from docx.oxml import OxmlElement, parse_xml
+from docx.oxml.ns import nsdecls, qn
 from docx.shared import Emu, Mm, Pt, RGBColor
 
 from .layout import Block, Entry, Line, Link, RenderDoc
 
 MUTED = RGBColor(0x44, 0x44, 0x44)
+PHOTO_W = Mm(28)  # 28 x 36 mm (7:9), the same size as in the PDF
 
 
 def _rgb(hex_color: str) -> RGBColor:
@@ -89,6 +92,38 @@ def _add_hyperlink(paragraph, text: str, url: str, color: RGBColor | None = None
     run.append(t)
     link.append(run)
     paragraph._p.append(link)
+
+
+def _float_top_right(inline, gap: int) -> None:
+    """Turn python-docx's inline picture into one floating at the right margin, text wrapping on its left.
+
+    python-docx can only insert inline pictures; a floating one needs a wp:anchor (children in schema order).
+    """
+    extent = inline.find(qn("wp:extent"))
+    anchor = parse_xml(
+        f'<wp:anchor {nsdecls("wp")} distT="0" distB="0" distL="{gap}" distR="0" simplePos="0" '
+        'relativeHeight="251659264" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="0">'
+        '<wp:simplePos x="0" y="0"/>'
+        '<wp:positionH relativeFrom="margin"><wp:align>right</wp:align></wp:positionH>'
+        '<wp:positionV relativeFrom="paragraph"><wp:posOffset>0</wp:posOffset></wp:positionV>'
+        f'<wp:extent cx="{extent.get("cx")}" cy="{extent.get("cy")}"/>'
+        '<wp:effectExtent l="0" t="0" r="0" b="0"/>'
+        '<wp:wrapSquare wrapText="left"/>'
+        "</wp:anchor>"
+    )
+    for tag in ("wp:docPr", "wp:cNvGraphicFramePr", "a:graphic"):
+        el = inline.find(qn(tag))
+        if el is not None:
+            anchor.append(el)
+    inline.getparent().replace(inline, anchor)
+
+
+def _clear_floats(paragraph) -> None:
+    """Line break that continues below the floating photo, so section headings run full width."""
+    br = OxmlElement("w:br")
+    br.set(qn("w:type"), "textWrapping")
+    br.set(qn("w:clear"), "all")
+    paragraph.add_run()._r.append(br)
 
 
 def _run(paragraph, text: str, bold=False, italic=False, size=None, color=None):
@@ -169,9 +204,17 @@ class _Writer:
 
     def header(self) -> None:
         src = self.src
-        align = WD_ALIGN_PARAGRAPH.CENTER if src.template.entry_style == "title_first" else WD_ALIGN_PARAGRAPH.LEFT
-        if src.name:
-            _run(self._p(align=align), src.name, bold=True, size=self.fs * 2.1)
+        centered = src.template.entry_style == "title_first" and not src.photo  # left-align next to a photo
+        align = WD_ALIGN_PARAGRAPH.CENTER if centered else WD_ALIGN_PARAGRAPH.LEFT
+        first = self._p(align=align) if src.name or src.photo else None
+        if first is not None and src.photo:
+            shape = first.add_run().add_picture(io.BytesIO(src.photo), width=PHOTO_W, height=Emu(PHOTO_W * 9 // 7))
+            docpr = shape._inline.find(qn("wp:docPr"))
+            docpr.set("name", "Photo")
+            docpr.set("descr", f"Photo of {src.name}" if src.name else "Photo")
+            _float_top_right(shape._inline, Mm(6))
+        if first is not None and src.name:
+            _run(first, src.name, bold=True, size=self.fs * 2.1)
         if src.headline:
             _run(self._p(align=align, space_after=2), src.headline, size=self.fs * 1.15, color=self.accent)
         if src.contacts:
@@ -188,7 +231,10 @@ class _Writer:
                     _run(p, " | ", color=MUTED, size=self.fs * 0.95)
                 _run(p, f"{k}: ", bold=True, color=MUTED, size=self.fs * 0.95)
                 _run(p, v, color=MUTED, size=self.fs * 0.95)
-        self._p(space_after=0)
+        if src.photo:
+            _clear_floats(self.d.paragraphs[-1])  # the break's empty line doubles as the gap below the header
+        else:
+            self._p(space_after=0)
 
     def heading(self, text: str) -> None:
         p = self.d.add_heading(text.upper(), level=1)

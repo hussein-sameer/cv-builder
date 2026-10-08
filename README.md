@@ -4,7 +4,7 @@
 
 A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF**, with an AI helper that drafts your profile summary and rewrites bullet points using the provider you choose: OpenAI-compatible APIs, Anthropic, Google Gemini or a local Ollama model. It supports multiple users, each with their own private CV library, and can be hosted for free (see [Free hosting on Northflank](#free-hosting-on-northflank)).
 
-- **Form editor.** Personal details, then sections you add when you need them: experience, education, skills, languages, certifications, projects, courses, volunteering, awards, publications, interests, references, plus custom entry or free-text sections. You can rename, reorder, hide or delete any section.
+- **Form editor.** Personal details (phone with a country-code picker, date of birth from a calendar, optional photo), then sections you add when you need them: experience, education, skills, languages, certifications, projects, courses, volunteering, awards, publications, interests, references, plus custom entry or free-text sections. You can rename, reorder, hide or delete any section.
 - **Live preview of the real PDF.** The server renders the PDF and the browser draws it with pdf.js, so the preview is the file you download. It also shows the page count.
 - **Two layouts.** *International ATS* (no personal data, `Mar 2021 – Present`) and *EU / UK* (nationality, work permit and driving licence block, `03/2021` dates first, CEFR language levels). Both are single-column and ATS-safe.
 - **Upload CV with AI.** Bring in an existing PDF or Word CV without retyping it. A three-step guide has you attach the file in any AI chat (ChatGPT, Claude, Gemini, Copilot…), paste an instruction the app gives you, then upload the `cv.json` the chat returns (or paste its reply). The instruction tells the AI to copy your wording exactly and invent nothing. The import is forgiving about date formats and section names, and lands as a new CV in your library. CV Builder never sees the original file.
@@ -25,17 +25,19 @@ A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF*
 | Real text layer with embedded TrueType fonts (copy and paste works) | n/a | ✅ |
 | Standard headings ("Experience", "Education", "Skills"…) | ✅ | ✅ |
 | Unicode names (é, ł, ü…) | ✅ | ✅ |
-| No photo or other images | ✅ | ✅ |
+| No images, unless you add a photo | ✅ | ✅ |
+| Photo (if added) floats beside the header; name and contacts stay real text, first in reading order | ✅ | ✅ |
 
-### Why there's no photo
+### Photo: optional, for the countries that expect one
 
-A photo isn't required by either layout, so CV Builder leaves it out on purpose:
+Upload a photo under **Personal details → Photo** and it's printed at the top right of both layouts (28 × 36 mm, cropped to passport proportions). With no photo, the files contain no images at all.
 
-- **International (UK, Ireland, US, Canada, Australia):** leave it out. Employers avoid photos because they show age, race, sex and disability, which equality law (UK Equality Act 2010, US Title VII/ADEA/ADA) says must not affect hiring. Many recruiters in these countries are used to photo-free CVs, and some discard CVs that include one.
-- **EU / Europass:** the photo is an optional field. The EU's own Europass instructions say to add one only if the employer asks for it, and to leave out any field you don't need. Photos are still common in parts of Europe (for example Germany and Austria), but they're a custom, not a rule. In Germany an employer can't require one, because the General Equal Treatment Act (AGG) bars selecting people by the traits a photo shows.
-- **ATS:** parsers can't read anything in an image. A headshot near the top can also push your name out of the place where parsers look for it. Keeping images out of the file is part of what keeps this app's DOCX and PDF ATS-safe.
+- **Add one** where photos are customary: Germany, Austria and Switzerland, much of the Middle East (including the Gulf) and Asia, or whenever a job ad asks for it.
+- **Leave it out** for the UK, Ireland, the US, Canada and Australia. Employers there avoid photos because they show age, race, sex and disability, which equality law (UK Equality Act 2010, US Title VII/ADEA/ADA) says must not affect hiring, and some recruiters discard CVs that include one. The ATS check reminds you when the International layout prints a photo.
+- **Europass** treats the photo as optional: the EU's own instructions say to add one only if the employer asks. In Germany an employer can't require one (General Equal Treatment Act, AGG), even though many still expect it.
+- **ATS:** parsers can't read an image, but they don't need to: your name and contact details stay real text at the top of the file, and the photo sits beside them (floating in the DOCX, a separate column in the PDF) instead of above them.
 
-If a job ad explicitly asks for a photo (common for some traditional employers in Germany, Austria and Switzerland), attach a separate professional headshot to the application, or add it to an exported DOCX by hand for that one application.
+Tip: keep a copy without the photo (**Duplicate to tailor**) for applications to countries that don't expect one.
 
 ## Quick start with Docker (your own machine)
 
