@@ -37,7 +37,7 @@ export function CvSwitcher() {
   }
 
   return (
-    <div className="popover-anchor cv-switcher">
+    <div className="popover-anchor cv-switcher" data-tour="cvs">
       <button type="button" className="switcher-btn" data-popover-trigger onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Your CVs" disabled={storageMode === 'loading'}>
         <Files size={15} />
         <span className="switcher-name">{storageMode === 'loading' ? 'Loading…' : docName || 'Untitled CV'}</span>

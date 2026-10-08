@@ -37,9 +37,10 @@ class User:
     email: str
     name: str
     is_admin: bool
+    tour_pending: bool = False  # new account that hasn't finished or skipped the guided tour yet
 
     def public(self) -> dict:
-        return {"id": self.id, "email": self.email, "name": self.name, "isAdmin": self.is_admin}
+        return {"id": self.id, "email": self.email, "name": self.name, "isAdmin": self.is_admin, "tourPending": self.tour_pending}
 
 
 LOCAL_USER = User(id="local", email="", name="Local user", is_admin=True)
@@ -164,7 +165,10 @@ def start_session(user_id: str, request: Request, response: Response) -> None:
 
 def _user_from_row(row: dict) -> User:
     email = row["email"]
-    return User(id=row["id"], email=email, name=row["name"], is_admin=email in config.settings.admin_emails)
+    return User(
+        id=row["id"], email=email, name=row["name"], is_admin=email in config.settings.admin_emails,
+        tour_pending=bool(row.get("tour_pending")),
+    )
 
 
 def current_user(request: Request) -> User:
@@ -176,7 +180,7 @@ def current_user(request: Request) -> User:
         raise HTTPException(401, "Please log in.")
     with get_db().tx() as c:
         row = c.one(
-            "SELECT u.id, u.email, u.name, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id "
+            "SELECT u.id, u.email, u.name, u.tour_pending, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id "
             "WHERE s.token_hash = ?",
             (_token_hash(token),),
         )
@@ -266,14 +270,14 @@ def signup(body: SignupBody, request: Request, response: Response):
             raise HTTPException(409, "An account with this email already exists. Log in instead.")
         first_user = c.one("SELECT COUNT(*) AS n FROM users")["n"] == 0
         c.execute(
-            "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO users (id, email, name, password_hash, created_at, tour_pending) VALUES (?, ?, ?, ?, ?, 1)",
             (user_id, email, body.name.strip()[:100], hash_password(body.password), _iso(_now())),
         )
         if first_user:  # CVs saved before accounts existed belong to the first account
             c.execute("UPDATE cvs SET user_id = ? WHERE user_id IS NULL OR user_id = 'local'", (user_id,))
     _signup_ip.hit(ip)
     start_session(user_id, request, response)
-    return {"user": _user_from_row({"id": user_id, "email": email, "name": body.name.strip()}).public()}
+    return {"user": _user_from_row({"id": user_id, "email": email, "name": body.name.strip(), "tour_pending": 1}).public()}
 
 
 @router.post("/login")
@@ -284,7 +288,7 @@ def login(body: LoginBody, request: Request, response: Response):
     if _fail_email.blocked(email) or _fail_ip.blocked(ip):
         raise HTTPException(429, "Too many failed attempts. Wait 15 minutes and try again.")
     with get_db().tx() as c:
-        row = c.one("SELECT id, email, name, password_hash FROM users WHERE email = ?", (email,))
+        row = c.one("SELECT id, email, name, password_hash, tour_pending FROM users WHERE email = ?", (email,))
     ok = verify_password(body.password, row["password_hash"] if row else _DUMMY_HASH) and row is not None
     if not ok:
         _fail_email.hit(email)
@@ -319,6 +323,15 @@ def change_password(body: PasswordBody, request: Request, user: User = Depends(c
         c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(body.new), user.id))
         # sign out every other device
         c.execute("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?", (user.id, keep))
+    return {"ok": True}
+
+
+@router.post("/tour-done")
+def tour_done(user: User = Depends(current_user)):
+    """The user finished or skipped the guided tour: don't start it again on any device."""
+    if config.settings.auth_enabled:  # without accounts the browser remembers it instead
+        with get_db().tx() as c:
+            c.execute("UPDATE users SET tour_pending = 0 WHERE id = ?", (user.id,))
     return {"ok": True}
 
 

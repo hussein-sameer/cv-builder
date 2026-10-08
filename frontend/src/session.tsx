@@ -2,7 +2,7 @@ import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError } from './api'
 import { Spinner } from './components/ui'
-import { clearUserLocalData, setStorageUser } from './storage'
+import { clearUserLocalData, setStorageUser, tourState } from './storage'
 import type { AuthConfig, SessionUser } from './types'
 
 interface Session {
@@ -10,6 +10,10 @@ interface Session {
   authEnabled: boolean
   /** Call after the server session is gone (logout, account deleted, expiry). */
   signedOut: (opts?: { wipeLocal?: boolean; message?: string }) => void
+  /** Start the guided tour: a new account (any device), or first use in this browser without accounts. */
+  tourPending: boolean
+  /** The tour was finished or skipped: remember it on the account (or in this browser without accounts). */
+  finishTour: () => void
 }
 
 const SessionCtx = createContext<Session | null>(null)
@@ -50,6 +54,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
       .catch((e) => (e instanceof ApiError && e.status === 401 ? toAnon() : setState({ kind: 'error', message: (e as Error).message })))
   }, [toAnon])
 
+  const finishTour = useCallback(() => {
+    setState((s) => (s.kind === 'in' ? { ...s, user: { ...s.user, tourPending: false } } : s))
+    if (state.kind === 'in' && !state.authEnabled) tourState.set('done')
+    else void api.tourDone().catch(() => undefined) // best effort: at worst it's offered again next time
+  }, [state])
+
   const signedOut = useCallback(
     (opts: { wipeLocal?: boolean; message?: string } = {}) => {
       clearUserLocalData(opts.wipeLocal)
@@ -80,9 +90,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
         </div>
       </div>
     )
-  if (state.kind === 'anon') return <AuthScreen config={state.config} notice={state.notice} onIn={(u) => enter(u, true)} />
+  if (state.kind === 'anon')
+    return (
+      <AuthScreen
+        config={state.config}
+        notice={state.notice}
+        onIn={(u) => enter(u, true)}
+      />
+    )
   return (
-    <SessionCtx.Provider value={{ user: state.user, authEnabled: state.authEnabled, signedOut }}>
+    <SessionCtx.Provider
+      value={{
+        user: state.user,
+        authEnabled: state.authEnabled,
+        signedOut,
+        tourPending: state.authEnabled ? state.user.tourPending : tourState.get() === null,
+        finishTour,
+      }}
+    >
       <div key={state.user.id} style={{ display: 'contents' }}>
         {children}
       </div>

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
+from app import db
 from app.auth import COOKIE, hash_password, verify_password
 from app.main import app
 from tests.conftest import signup
@@ -136,3 +137,32 @@ def test_security_headers(anon):
 def test_oversized_body_rejected(client):
     r = client.post("/api/cvs", content=b"{}", headers={"Content-Type": "application/json", "Content-Length": str(5 * 1024 * 1024)})
     assert r.status_code == 413
+
+
+def test_guided_tour_is_per_account(anon):
+    r = anon.post("/api/auth/signup", json={"email": "alex@example.com", "password": "correct horse"})
+    assert r.json()["user"]["tourPending"] is True  # new accounts get the tour
+    assert anon.get("/api/auth/me").json()["user"]["tourPending"] is True
+    assert anon.post("/api/auth/tour-done").json() == {"ok": True}
+    assert anon.get("/api/auth/me").json()["user"]["tourPending"] is False
+    other_device = TestClient(app)  # the account remembers it, not the browser
+    r = other_device.post("/api/auth/login", json={"email": "alex@example.com", "password": "correct horse"})
+    assert r.json()["user"]["tourPending"] is False
+    assert other_device.get("/api/auth/me").json()["user"]["tourPending"] is False
+
+
+def test_accounts_from_before_the_tour_dont_get_it(anon, database):
+    signup(anon)
+    with database.tx() as c:  # a database from before the column existed
+        c.execute("ALTER TABLE users DROP COLUMN tour_pending")
+    upgraded = db.configure(database.url)  # restart: the column is added back
+    with upgraded.tx() as c:
+        assert c.one("SELECT tour_pending FROM users")["tour_pending"] == 0
+    assert anon.get("/api/auth/me").json()["user"]["tourPending"] is False
+    newcomer = signup(TestClient(app), email="sam@example.com")
+    assert newcomer.get("/api/auth/me").json()["user"]["tourPending"] is True
+    db.configure(database.url)  # running the upgrade again is a no-op
+
+
+def test_tour_done_requires_login(anon):
+    assert anon.post("/api/auth/tour-done").status_code == 401

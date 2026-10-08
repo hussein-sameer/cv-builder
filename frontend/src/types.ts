@@ -165,6 +165,8 @@ export interface SessionUser {
   email: string
   name: string
   isAdmin: boolean
+  /** new account that hasn't finished or skipped the guided tour (stored on the account) */
+  tourPending: boolean
 }
 
 export interface AuthConfig {

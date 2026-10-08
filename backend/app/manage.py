@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> None:
             if row:
                 sys.exit("User already exists.")
             c.execute(
-                "INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, '', ?, ?)",
+                "INSERT INTO users (id, email, name, password_hash, created_at, tour_pending) VALUES (?, ?, '', ?, ?, 1)",
                 (uuid.uuid4().hex, email, hash_password(_ask_password()), _now()),
             )
             print("Created", email)

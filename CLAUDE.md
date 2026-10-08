@@ -88,7 +88,7 @@ frontend/src/
                        and bump the ?v= in index.html so browsers drop the cached icon
   components/          TopBar, CvSwitcher, AccountMenu, EditorCards (personal/target/add-section), SectionCard,
                        ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange), PhoneInput,
-                       AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), PdfPreview, AtsPanel,
+                       AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), Tour (guided tour), PdfPreview, AtsPanel,
                        ui (Modal, Popover, ConfirmDelete, Spinner)
 ```
 
@@ -140,7 +140,8 @@ numbers become `[X%]`-style placeholders that the ATS check flags.
 
 **Database.** `DATABASE_URL`, else `POSTGRES_URI` (Northflank addon), else SQLite at
 `DATA_DIR/cvs.db`. Tables: `users, sessions, cvs, ai_usage, ai_keys`. Schema is created idempotently on startup
-in `db.SCHEMA`; there is no migration framework.
+in `db.SCHEMA`; columns added to existing tables later are listed in `db.ADDED_COLUMNS`. There is no
+migration framework.
 
 ## Invariants — do not break these
 
@@ -202,9 +203,10 @@ method in `frontend/src/api.ts`, add tests using the `client` fixture (and `anon
 **Add an env setting:** field on `config.Settings` + `load_settings()`; read it as `config.settings.x`
 at call time (tests monkeypatch `config.settings`); document it in `.env.example` and `README.md`.
 
-**Add a DB table/column:** append to `db.SCHEMA` (idempotent) and, for columns on existing tables, add a
-guarded upgrade in `Database._init_schema` for SQLite *and* `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-for Postgres. Add the table to `TABLES` in `tests/conftest.py` so tests start clean.
+**Add a DB table/column:** append to `db.SCHEMA` (idempotent). For a column on an existing table, also put
+it in the `CREATE TABLE` and add `(table, column, definition)` to `db.ADDED_COLUMNS`: startup adds it with a
+`PRAGMA table_info` check on SQLite and `ADD COLUMN IF NOT EXISTS` on Postgres. Give it a default that is
+right for rows that already exist. Add new tables to `TABLES` in `tests/conftest.py` so tests start clean.
 
 **Add an AI provider:** adapter functions in `ai/providers.py` (`chat` + `list_models` branches,
 `PROVIDER_INFO` entry, default in `config.py`), extend `ProviderType` in both languages, add a mocked
@@ -256,7 +258,15 @@ test in `tests/test_ai.py`.
 - **Photo is optional and off unless uploaded.** Stored in the CV JSON as a JPEG data URL (the editor
   crops it to 7:9 and shrinks it to ~50 KB in `photo.ts`; `layout.photo_jpeg` re-crops server-side so
   imported JSON prints alike). Expected in DACH, the Gulf and much of Asia; discouraged for UK/IE/US/CA
-  (the ATS check says so for the International layout). The reasoning for users is in README → "Photo".
+  (the ATS check says so for the International layout).
+- **Guided tour.** `components/Tour.tsx` highlights elements marked `data-tour="…"` (TopBar, CvSwitcher,
+  App, EditorCards): keep those attributes when refactoring, and add one when a new feature deserves a step.
+  "Seen" is per account: `users.tour_pending` is 1 for accounts created by sign-up or `manage create-user`
+  (0 for accounts that existed before the tour), exposed as `user.tourPending` and cleared by
+  `POST /api/auth/tour-done` when the tour is finished or skipped, so it never repeats on another device.
+  With `AUTH_ENABLED=false` there's no account row, so the browser remembers it (`storage.tourState`).
+  Replay: ⋯ → Show tutorial, or "Take the tour" on the welcome card. Steps whose target is hidden (e.g. the ATS check on a phone's
+  Edit tab) are dropped when marked `optional`.
 - **Phone and date of birth.** `personal.phone` stays one string ("+964 770…"); `PhoneInput` splits it
   with the prefix-free calling codes in `countries.ts` and never preselects a country. `dateOfBirth` is
   ISO `YYYY-MM-DD` from a date picker, printed `DD/MM/YYYY` (`layout.format_birth_date`); older free-text
