@@ -21,7 +21,7 @@ export function PersonalCard() {
   const set = (k: keyof Personal) => (v: string) => mutate((d) => void (d.personal[k] = v))
 
   return (
-    <section className="card" id="section-personal">
+    <section className="card" id="section-personal" data-tour="personal">
       <header className="card-head static">
         <span className="section-icon">
           <UserRound size={16} />
@@ -205,7 +205,7 @@ export function AddSection() {
   }
 
   return (
-    <div className="add-section">
+    <div className="add-section" data-tour="add-section">
       <button type="button" className="btn primary block" onClick={() => setOpen(!open)} aria-expanded={open}>
         <Plus size={16} /> Add section
       </button>

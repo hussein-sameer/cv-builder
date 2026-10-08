@@ -88,7 +88,7 @@ frontend/src/
                        and bump the ?v= in index.html so browsers drop the cached icon
   components/          TopBar, CvSwitcher, AccountMenu, EditorCards (personal/target/add-section), SectionCard,
                        ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange), PhoneInput,
-                       AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), PdfPreview, AtsPanel,
+                       AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), Tour (guided tour), PdfPreview, AtsPanel,
                        ui (Modal, Popover, ConfirmDelete, Spinner)
 ```
 
@@ -257,6 +257,12 @@ test in `tests/test_ai.py`.
   crops it to 7:9 and shrinks it to ~50 KB in `photo.ts`; `layout.photo_jpeg` re-crops server-side so
   imported JSON prints alike). Expected in DACH, the Gulf and much of Asia; discouraged for UK/IE/US/CA
   (the ATS check says so for the International layout). The reasoning for users is in README → "Photo".
+- **Guided tour.** `components/Tour.tsx` highlights elements marked `data-tour="…"` (TopBar, CvSwitcher,
+  App, EditorCards): keep those attributes when refactoring, and add one when a new feature deserves a step.
+  It starts once after sign-up (`AuthScreen` -> `tourState` 'pending' in storage.ts, per user, per browser)
+  or on first use with `AUTH_ENABLED=false`; finishing or skipping stores 'done'. Replay: ⋯ → Show tutorial,
+  or "Take the tour" on the welcome card. Steps whose target is hidden (e.g. the ATS check on a phone's
+  Edit tab) are dropped when marked `optional`.
 - **Phone and date of birth.** `personal.phone` stays one string ("+964 770…"); `PhoneInput` splits it
   with the prefix-free calling codes in `countries.ts` and never preselects a country. `dateOfBirth` is
   ISO `YYYY-MM-DD` from a date picker, printed `DD/MM/YYYY` (`layout.format_birth_date`); older free-text

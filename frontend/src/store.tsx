@@ -36,6 +36,8 @@ interface Store {
   openAISettings: (open?: boolean) => void
   importOpen: boolean
   openImport: (open?: boolean) => void
+  tourOpen: boolean
+  openTour: (open?: boolean) => void
   /** Add an imported CV: a new library entry (server) or replaces the browser-only CV (Undo restores it). */
   importCV: (cv: CV, name: string) => Promise<boolean>
   toasts: Toast[]
@@ -102,6 +104,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [savedKeys, setSavedKeys] = useState<SavedKey[]>([])
   const [aiModalOpen, setAIModalOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [tourOpen, setTourOpen] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const lastSnapshot = useRef<number>(0)
   // the CV object last loaded from / written to the server – no need to save it again
@@ -393,12 +396,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       openAISettings: (open = true) => setAIModalOpen(open),
       importOpen,
       openImport: (open = true) => setImportOpen(open),
+      tourOpen,
+      openTour: (open = true) => setTourOpen(open),
       importCV,
       toasts,
       toast,
       dismissToast,
     }),
-    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, savedKeys, aiReady, aiModalOpen, importOpen, importCV, toasts, toast, dismissToast],
+    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, savedKeys, aiReady, aiModalOpen, importOpen, importCV, tourOpen, toasts, toast, dismissToast],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

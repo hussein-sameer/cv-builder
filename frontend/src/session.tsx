@@ -2,7 +2,7 @@ import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError } from './api'
 import { Spinner } from './components/ui'
-import { clearUserLocalData, setStorageUser } from './storage'
+import { clearUserLocalData, setStorageUser, tourState } from './storage'
 import type { AuthConfig, SessionUser } from './types'
 
 interface Session {
@@ -80,7 +80,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
         </div>
       </div>
     )
-  if (state.kind === 'anon') return <AuthScreen config={state.config} notice={state.notice} onIn={(u) => enter(u, true)} />
+  if (state.kind === 'anon')
+    return (
+      <AuthScreen
+        config={state.config}
+        notice={state.notice}
+        onIn={(u, isNew) => {
+          enter(u, true) // namespaces browser storage to this user first
+          if (isNew) tourState.set('pending') // new accounts get the guided tour once
+        }}
+      />
+    )
   return (
     <SessionCtx.Provider value={{ user: state.user, authEnabled: state.authEnabled, signedOut }}>
       <div key={state.user.id} style={{ display: 'contents' }}>
@@ -90,7 +100,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   )
 }
 
-function AuthScreen({ config, notice, onIn }: { config: AuthConfig; notice?: string; onIn: (u: SessionUser) => void }) {
+function AuthScreen({ config, notice, onIn }: { config: AuthConfig; notice?: string; onIn: (u: SessionUser, isNew: boolean) => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -105,7 +115,7 @@ function AuthScreen({ config, notice, onIn }: { config: AuthConfig; notice?: str
     if (mode === 'signup' && password.length < 8) return setError('Password must be at least 8 characters.')
     setBusy(true)
     try {
-      onIn(mode === 'login' ? await api.login(email, password) : await api.signup(email, password, name))
+      onIn(mode === 'login' ? await api.login(email, password) : await api.signup(email, password, name), mode === 'signup')
     } catch (err) {
       setError((err as Error).message)
     } finally {

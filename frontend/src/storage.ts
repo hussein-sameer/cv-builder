@@ -6,6 +6,7 @@ const BASE_KEYS = {
   ai: 'cvbuilder.ai.v1',
   aiKeys: 'cvbuilder.ai.keys.v1',
   lastDoc: 'cvbuilder.lastDoc',
+  tour: 'cvbuilder.tour',
 }
 
 // Everything kept in the browser is namespaced per signed-in user, so two people
@@ -52,6 +53,12 @@ export function hasLocalCV(): boolean {
   return !!safeGet(localStorage, key('cv'))
 }
 
+/** Onboarding tour: 'pending' right after sign-up (survives a reload), 'done' once finished or skipped. */
+export const tourState = {
+  get: () => safeGet(localStorage, key('tour')),
+  set: (v: 'pending' | 'done') => safeSet(localStorage, key('tour'), v),
+}
+
 export const lastDoc = {
   get: () => safeGet(localStorage, key('lastDoc')),
   set: (id: string) => safeSet(localStorage, key('lastDoc'), id),
@@ -65,6 +72,7 @@ export function clearUserLocalData(everything = false): void {
     if (everything) {
       localStorage.removeItem(key('ai'))
       localStorage.removeItem(key('lastDoc'))
+      localStorage.removeItem(key('tour'))
     }
   } catch {
     /* storage unavailable */

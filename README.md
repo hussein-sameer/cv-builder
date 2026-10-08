@@ -13,6 +13,7 @@ A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF*
 - **ATS check.** Flags missing contact details, missing dates, weak bullet openers ("Responsible for…"), unfilled placeholders, emoji and page count.
 - **Design.** Font (Calibri, Arial, Cambria, Times New Roman, Georgia), size, accent colour, A4 or Letter.
 - **Accounts.** Sign up / log in with email and password; every user only sees their own CVs. Change password, log out, delete account (removes all their CVs).
+- **Guided tour.** New accounts get a one-minute tour of the main parts (CV library, layouts, Upload CV with AI, sections, AI, preview, ATS check, downloads). Skip it any time; replay it from **⋯ → Show tutorial** or **Take the tour** on the welcome card.
 - **Comfortable editing.** Light, dark or system theme (remembered per browser). **Collapse all / Expand all** on every section with entries. Undo with Ctrl+Z.
 
 ## What makes the output ATS-friendly

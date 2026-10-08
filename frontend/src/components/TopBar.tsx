@@ -1,4 +1,4 @@
-import { Bot, FileDown, Monitor, Moon, Sun, FileJson, FileText, FileUp, MoreHorizontal, Palette, RotateCcw, Sparkle, Undo2, WandSparkles } from 'lucide-react'
+import { Bot, Compass, FileDown, Monitor, Moon, Sun, FileJson, FileText, FileUp, MoreHorizontal, Palette, RotateCcw, Sparkle, Undo2, WandSparkles } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { api, fileName } from '../api'
 import { parseCvText } from '../cvImport'
@@ -28,7 +28,7 @@ const FONTS = ['Calibri', 'Arial', 'Cambria', 'Times New Roman', 'Georgia']
 const ACCENTS = ['#1F3864', '#000000', '#1D4E89', '#0F5257', '#7A1F2B', '#4B3F72']
 
 export function TopBar() {
-  const { cv, mutate, replaceCV, undo, canUndo, templates, ai, aiReady, aiConfig, openAISettings, openImport, importCV, toast, storageMode, createDoc } = useStore()
+  const { cv, mutate, replaceCV, undo, canUndo, templates, ai, aiReady, aiConfig, openAISettings, openImport, openTour, importCV, toast, storageMode, createDoc } = useStore()
   const [designOpen, setDesignOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [busy, setBusy] = useState<'pdf' | 'docx' | null>(null)
@@ -82,7 +82,7 @@ export function TopBar() {
       </div>
       <CvSwitcher />
 
-      <div className="segmented template-switch" role="radiogroup" aria-label="Layout">
+      <div className="segmented template-switch" role="radiogroup" aria-label="Layout" data-tour="layout">
         {(['international', 'europass'] as TemplateKey[]).map((k) => (
           <button
             type="button"
@@ -163,6 +163,7 @@ export function TopBar() {
         <button
           type="button"
           className={`btn ghost ai-status ${aiReady ? 'ready' : ''}`}
+          data-tour="ai"
           onClick={() => openAISettings(true)}
           aria-label={aiReady ? `AI settings (${aiLabel})` : 'Connect AI'}
           title={aiReady ? `AI: ${aiLabel}` : 'Connect an AI provider'}
@@ -172,7 +173,7 @@ export function TopBar() {
         </button>
 
         <div className="popover-anchor">
-          <button type="button" className="icon-btn" data-popover-trigger aria-label="More" title="More" onClick={() => setMenuOpen(!menuOpen)}>
+          <button type="button" className="icon-btn" data-popover-trigger aria-label="More" title="More" onClick={() => setMenuOpen(!menuOpen)} data-tour="more">
             <MoreHorizontal size={18} />
           </button>
           <Popover open={menuOpen} onClose={() => setMenuOpen(false)} className="menu">
@@ -193,6 +194,16 @@ export function TopBar() {
               <FileJson size={15} /> Export this CV as JSON
             </button>
             <hr />
+            <button
+              type="button"
+              className="menu-item"
+              onClick={() => {
+                setMenuOpen(false)
+                openTour(true)
+              }}
+            >
+              <Compass size={15} /> Show tutorial
+            </button>
             <button
               type="button"
               className="menu-item"
@@ -219,7 +230,7 @@ export function TopBar() {
           <input ref={fileRef} type="file" accept="application/json,.json,text/plain,.txt" hidden onChange={(e) => e.target.files?.[0] && importJSON(e.target.files[0])} />
         </div>
 
-        <div className="download-group">
+        <div className="download-group" data-tour="download">
           <button type="button" className="btn" onClick={() => download('docx')} disabled={!!busy}>
             {busy === 'docx' ? <Spinner /> : <FileText size={16} className="hide-sm" />} DOCX
           </button>

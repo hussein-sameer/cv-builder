@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Eye, PencilLine, ShieldCheck, Sparkle, WandSparkles, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Compass, Eye, PencilLine, ShieldCheck, Sparkle, WandSparkles, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { atsCheck } from './atsCheck'
 import { AiSettingsModal } from './components/AiSettingsModal'
@@ -7,8 +7,10 @@ import { AddSection, PersonalCard, TargetCard } from './components/EditorCards'
 import { ImportCvModal } from './components/ImportCvModal'
 import { SectionCard } from './components/SectionCard'
 import { TopBar } from './components/TopBar'
+import { Tour } from './components/Tour'
 import { exampleCV } from './defaults'
-import { AuthGate } from './session'
+import { AuthGate, useSession } from './session'
+import { tourState } from './storage'
 import { StoreProvider, useStore } from './store'
 
 // pdf.js is large – load it after the editor is interactive
@@ -25,7 +27,8 @@ export default function App() {
 }
 
 function Shell() {
-  const { cv, replaceCV, undo, toasts, dismissToast, storageMode, createDoc, docId, openImport } = useStore()
+  const { cv, replaceCV, undo, toasts, dismissToast, storageMode, createDoc, docId, openImport, tourOpen, openTour } = useStore()
+  const { authEnabled } = useSession()
   const [pages, setPages] = useState<number | null>(null)
   const [tab, setTab] = useState<'edit' | 'preview'>('edit')
   const [atsOpen, setAtsOpen] = useState(false)
@@ -37,6 +40,21 @@ function Shell() {
 
   const isBlank =
     !cv.personal.fullName && cv.sections.every((s) => !s.content.trim() && s.items.every((it) => !it.title && !it.tags.length))
+
+  // Guided tour once after sign-up (or on first use without accounts), when the editor has loaded.
+  useEffect(() => {
+    if (storageMode === 'loading') return
+    const state = tourState.get()
+    if (state !== 'pending' && !(state === null && !authEnabled)) return
+    const t = setTimeout(() => openTour(true), 600)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageMode])
+
+  // the tour points at the editor, so show it on phones
+  useEffect(() => {
+    if (tourOpen) setTab('edit')
+  }, [tourOpen])
 
   // Ctrl/Cmd+Z outside text fields = app-level undo (inside fields, the browser's own undo applies)
   useEffect(() => {
@@ -68,7 +86,7 @@ function Shell() {
         <button type="button" className={tab === 'edit' ? 'active' : ''} onClick={() => setTab('edit')}>
           <PencilLine size={15} /> Edit
         </button>
-        <button type="button" className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')}>
+        <button type="button" className={tab === 'preview' ? 'active' : ''} onClick={() => setTab('preview')} data-tour="preview-tab">
           <Eye size={15} /> Preview {pages ? `· ${pages}p` : ''}
         </button>
       </nav>
@@ -86,11 +104,14 @@ function Shell() {
                   for you.
                 </p>
                 <div className="welcome-actions">
-                  <button type="button" className="btn ai" onClick={() => openImport(true)}>
+                  <button type="button" className="btn ai" onClick={() => openImport(true)} data-tour="import">
                     <WandSparkles size={15} /> Upload CV with AI
                   </button>
                   <button type="button" className="btn" onClick={() => (storageMode === 'server' ? void createDoc('example', 'Example CV') : replaceCV(exampleCV()))}>
                     <Sparkle size={15} /> Load example
+                  </button>
+                  <button type="button" className="btn ghost" onClick={() => openTour(true)}>
+                    <Compass size={15} /> Take the tour
                   </button>
                 </div>
               </div>
@@ -104,11 +125,11 @@ function Shell() {
           )}
         </div>
 
-        <aside className="preview">
+        <aside className="preview" data-tour="preview">
           <div className="preview-head">
             <span className="preview-title">Live preview</span>
             {pages !== null && <span className={`badge ${pages > 2 ? 'warn' : ''}`}>{pages} page{pages === 1 ? '' : 's'}</span>}
-            <button type="button" className={`ats-toggle ${errors ? 'err' : warns ? 'warn' : 'ok'}`} onClick={() => setAtsOpen(!atsOpen)} aria-expanded={atsOpen}>
+            <button type="button" className={`ats-toggle ${errors ? 'err' : warns ? 'warn' : 'ok'}`} onClick={() => setAtsOpen(!atsOpen)} aria-expanded={atsOpen} data-tour="ats">
               {errors || warns ? <AlertCircle size={15} /> : issues.length ? <ShieldCheck size={15} /> : <CheckCircle2 size={15} />}
               ATS check
               {issues.length > 0 && <span className="count">{issues.length}</span>}
@@ -123,6 +144,7 @@ function Shell() {
 
       <AiSettingsModal />
       <ImportCvModal />
+      <Tour />
 
       <div className="toasts" aria-live="polite">
         {toasts.map((t) => (
