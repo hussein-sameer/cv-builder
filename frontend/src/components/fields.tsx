@@ -38,6 +38,25 @@ export function TextInput(props: {
   )
 }
 
+/**
+ * Grow a textarea to fit its text. While it's empty, fit the placeholder instead: Safari and Firefox leave it
+ * out of scrollHeight, so a hint that wraps on a phone would be cut off after its first line.
+ */
+function fitHeight(el: HTMLTextAreaElement) {
+  if (!el.offsetWidth) return // hidden (e.g. the phone's Preview tab is showing): fitted once it has a width
+  let probe = el
+  if (!el.value && el.placeholder) {
+    probe = el.cloneNode() as HTMLTextAreaElement
+    probe.value = el.placeholder
+    Object.assign(probe.style, { position: 'absolute', visibility: 'hidden', width: `${el.offsetWidth}px` })
+    probe.setAttribute('aria-hidden', 'true')
+    el.after(probe)
+  }
+  probe.style.height = 'auto'
+  el.style.height = `${probe.scrollHeight + 2}px`
+  if (probe !== el) probe.remove()
+}
+
 export function AutoTextArea(props: {
   value: string
   onChange: (v: string) => void
@@ -51,11 +70,21 @@ export function AutoTextArea(props: {
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null)
   useLayoutEffect(() => {
+    if (ref.current) fitHeight(ref.current)
+  }, [props.value, props.placeholder])
+  // text re-wraps when the box changes width (phone rotation, a panel shown after being hidden), so refit then too
+  useEffect(() => {
     const el = ref.current
     if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight + 2}px`
-  }, [props.value])
+    let width = el.offsetWidth
+    const observer = new ResizeObserver(() => {
+      if (el.offsetWidth === width) return
+      width = el.offsetWidth
+      fitHeight(el)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   return (
     <textarea
       ref={(el) => {
