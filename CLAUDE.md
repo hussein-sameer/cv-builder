@@ -75,6 +75,8 @@ frontend/src/
   atsCheck.ts          Client-side ATS lint rules shown in the "ATS check" panel
   cvImport.ts          "Upload CV with AI": the instruction users paste into an external AI chat, and parseCvText(),
                        the lenient JSON -> CV importer (code fences, date formats, section aliases) used by every JSON import
+  countries.ts         Calling codes (ISO, name, dial) + splitPhone() for the phone field
+  photo.ts             Crops/shrinks an uploaded photo to a 7:9 JPEG data URL
   useAI.ts             Hook wrapping AI calls (readiness, busy flag, error toasts, low-quota notice)
   theme.ts             light/dark/system theme hook; index.html applies it before first paint
   styles.css           ALL styling; design tokens at the top, dark theme overrides in :root[data-theme='dark'].
@@ -85,7 +87,7 @@ frontend/src/
                        favicon.ico + apple-touch-icon.png rendered from favicon.svg: regenerate both if it changes
                        and bump the ?v= in index.html so browsers drop the cached icon
   components/          TopBar, CvSwitcher, AccountMenu, EditorCards (personal/target/add-section), SectionCard,
-                       ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange),
+                       ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange), PhoneInput,
                        AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), PdfPreview, AtsPanel,
                        ui (Modal, Popover, ConfirmDelete, Spinner)
 ```
@@ -144,8 +146,11 @@ in `db.SCHEMA`; there is no migration framework.
 
 1. **ATS safety of DOCX:** single column; **no tables, text boxes, images or content in headers/footers**;
    section headings use the real `Heading 1` style; bullets use `List Bullet`; contact details are in the
-   body. `tests/test_export.py` enforces this. (The PDF may use a borderless ReportLab table for the
-   title/date row; that's only layout, the text layer stays linear.)
+   body. `tests/test_export.py` enforces this. The one allowed image is the user's optional photo
+   (`personal.photo`): floated top right in the DOCX (`wp:anchor` on the name paragraph, square wrap,
+   then a `w:clear="all"` break), never inline above the name, never in a header. (The PDF may use a
+   borderless ReportLab table for the title/date row and for header text | photo; that's only layout,
+   the text layer stays linear.)
 2. **Both renderers stay in sync.** New CV content goes into `layout.py` (IR) first, then into *both*
    renderers. Never special-case one format.
 3. **PDFs keep a real text layer** with embedded TTF fonts (Unicode names must survive; there's a test).
@@ -248,10 +253,14 @@ test in `tests/test_ai.py`.
 
 ## Known limitations / ideas
 
-- **No photo field, by design.** Neither layout requires one: international CVs (UK/US/IE/CA/AU) should
-  leave it out for anti-discrimination reasons, and the Europass photo is optional ("only if the employer
-  asks"). Images also break invariant 1 and give ATS parsers nothing to read. Don't add a photo field
-  unless the owner asks; the reasoning for users is in README → "Why there's no photo".
+- **Photo is optional and off unless uploaded.** Stored in the CV JSON as a JPEG data URL (the editor
+  crops it to 7:9 and shrinks it to ~50 KB in `photo.ts`; `layout.photo_jpeg` re-crops server-side so
+  imported JSON prints alike). Expected in DACH, the Gulf and much of Asia; discouraged for UK/IE/US/CA
+  (the ATS check says so for the International layout). The reasoning for users is in README → "Photo".
+- **Phone and date of birth.** `personal.phone` stays one string ("+964 770…"); `PhoneInput` splits it
+  with the prefix-free calling codes in `countries.ts` and never preselects a country. `dateOfBirth` is
+  ISO `YYYY-MM-DD` from a date picker, printed `DD/MM/YYYY` (`layout.format_birth_date`); older free-text
+  values are converted by `defaults.toIsoDay` when possible and otherwise kept as typed.
 
 - No email-based password reset (admin CLI only); no email verification on sign-up.
 - Login/sign-up throttles are in-memory, so they reset on restart and assume one instance.

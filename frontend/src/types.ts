@@ -56,6 +56,8 @@ export interface Personal {
   dateOfBirth: string
   workPermit: string
   drivingLicence: string
+  /** optional photo as a JPEG data URL ("" = none); printed top right in both layouts */
+  photo: string
 }
 
 export interface Design {

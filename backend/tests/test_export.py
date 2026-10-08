@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 import zipfile
@@ -5,9 +6,10 @@ from pathlib import Path
 
 import pytest
 from docx import Document
+from PIL import Image
 from pypdf import PdfReader
 
-from app.layout import build_document, format_date, years_of_experience
+from app.layout import build_document, format_birth_date, format_date, years_of_experience
 from app.models import CV
 
 SAMPLE = json.loads((Path(__file__).parent / "sample_cv.json").read_text())
@@ -48,7 +50,7 @@ def test_docx_is_ats_safe(client, template):
         assert not any(p.text.strip() for p in s.footer.paragraphs)
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         xml = z.read("word/document.xml").decode()
-    assert "txbxContent" not in xml and "<w:drawing" not in xml  # no text boxes / images
+    assert "txbxContent" not in xml and "<w:drawing" not in xml  # no text boxes / images without a photo
     text = "\n".join(p.text for p in doc.paragraphs)
     assert "Alex Morgan" in text and "Northwind Fibre" in text
     headings = [p.text for p in doc.paragraphs if p.style.name == "Heading 1"]
@@ -107,3 +109,60 @@ def test_meta_and_health(client):
 def test_exports_require_login(anon):
     assert anon.post("/api/export/pdf", json=_cv()).status_code == 401
     assert anon.post("/api/export/docx", json=_cv()).status_code == 401
+
+
+def _photo(w=300, h=500, mode="RGB") -> str:
+    """A synthetic test image (no real person) as the data URL the editor sends."""
+    im = Image.new(mode, (w, h), (40, 90, 160) if mode == "RGB" else (40, 90, 160, 128))
+    buf = io.BytesIO()
+    im.save(buf, "JPEG" if mode == "RGB" else "PNG")
+    kind = "jpeg" if mode == "RGB" else "png"
+    return f"data:image/{kind};base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+@pytest.mark.parametrize("template", ["international", "europass"])
+def test_photo_in_both_formats(client, template):
+    data = _cv(template)
+    data["personal"]["photo"] = _photo()
+
+    pdf = PdfReader(io.BytesIO(client.post("/api/export/pdf", json=data).content))
+    assert len(pdf.pages) == 1 and len(pdf.pages[0].images) == 1
+    text = pdf.pages[0].extract_text()
+    assert text.index("Alex Morgan") < text.index("alex.morgan@example.com") < text.index("Northwind Fibre")
+
+    r = client.post("/api/export/docx", json=data)
+    doc = Document(io.BytesIO(r.content))
+    assert len(doc.tables) == 0  # still single column, text not in a table
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        xml = z.read("word/document.xml").decode()
+        assert any(n.startswith("word/media/") for n in z.namelist())
+    assert xml.count("<w:drawing") == 1 and "<wp:anchor" in xml and "<wp:inline" not in xml  # floated, not inline
+    assert 'descr="Photo of Alex Morgan"' in xml and 'w:clear="all"' in xml
+    assert "txbxContent" not in xml
+    for s in doc.sections:
+        assert not s.header._element.xpath(".//w:drawing")
+    assert doc.paragraphs[0].text == "Alex Morgan"
+
+
+def test_photo_is_normalised_and_bad_photos_are_handled(client):
+    doc = build_document(CV.model_validate({"personal": {"photo": _photo(800, 300, "RGBA")}}))
+    with Image.open(io.BytesIO(doc.photo)) as im:  # landscape PNG with alpha -> 7:9 RGB JPEG
+        assert im.format == "JPEG" and im.mode == "RGB" and im.size == (420, 540)
+
+    data = _cv()
+    data["personal"]["photo"] = "https://example.com/me.jpg"  # only embedded images are accepted
+    assert client.post("/api/export/pdf", json=data).status_code == 422
+    data["personal"]["photo"] = "data:image/jpeg;base64," + base64.b64encode(b"not an image").decode()
+    r = client.post("/api/export/docx", json=data)  # undecodable: the CV still exports, without a photo
+    assert r.status_code == 200 and b"word/media/" not in r.content
+
+
+def test_birth_date_and_phone_code_only():
+    assert format_birth_date("1990-03-15") == "15/03/1990"
+    assert format_birth_date("15 March 1990") == "15 March 1990"  # older free text kept as typed
+    data = _cv("europass")
+    data["personal"]["dateOfBirth"] = "1990-03-15"
+    data["personal"]["phone"] = "+964"  # a code picked, no number yet
+    doc = build_document(CV.model_validate(data))
+    assert ("Date of birth", "15/03/1990") in doc.details
+    assert all(c.text != "+964" for c in doc.contacts)

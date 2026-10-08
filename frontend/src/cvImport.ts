@@ -1,4 +1,5 @@
 import { emptyItem, normalizeCV } from './defaults'
+import { isPhotoDataUrl } from './photo'
 import { SECTION_TYPES } from './sectionTypes'
 import type { CV, Design, Item, SectionType } from './types'
 
@@ -38,7 +39,7 @@ Section types (pick the closest; anything that fits none goes into "custom" if i
 - "interests", "references", "customText": the text goes in "content".
 - "custom": items like experience: title, organization, location, startDate, endDate, current, description, bullets.
 
-Personal details: "headline" is the job title under my name, if there is one. Copy LinkedIn, GitHub and website addresses as written. Fill "nationality", "dateOfBirth", "workPermit" and "drivingLicence" only if my CV states them. Leave out any photo.
+Personal details: "headline" is the job title under my name, if there is one. Copy the phone number with its country code, and LinkedIn, GitHub and website addresses, as written. Fill "nationality", "dateOfBirth" (as YYYY-MM-DD), "workPermit" and "drivingLicence" only if my CV states them. Leave out any photo.
 
 Format (fill in my details; include only the sections my CV has, with as many items as needed):
 {
@@ -178,6 +179,7 @@ export function parseCvText(text: string): CV {
     ),
   )
   personal.fullName ||= str(p.name)
+  personal.photo = isPhotoDataUrl(p.photo) ? p.photo : '' // only a CV Builder export carries one
 
   const sections = (Array.isArray(raw.sections) ? raw.sections : []).filter(isRec).flatMap((s) => {
     const heading = str(s.title)

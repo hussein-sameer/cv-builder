@@ -1,7 +1,8 @@
 """Text-based, single-column PDF renderer (ReportLab).
 
-No images, no text-as-graphics: every character lives in the PDF text layer
-with an embedded TrueType font, so ATS parsers and copy/paste both work.
+No text-as-graphics: every character lives in the PDF text layer with an
+embedded TrueType font, so ATS parsers and copy/paste both work. The only
+image is the optional photo, placed beside the header text.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import (
     HRFlowable,
+    Image,
     KeepTogether,
     ListFlowable,
     ListItem,
@@ -30,6 +32,7 @@ from .fonts import resolve_font
 from .layout import Block, Entry, Line, Link, RenderDoc
 
 MUTED = colors.HexColor("#444444")
+PHOTO_W = 28 * mm  # printed 28 x 36 mm (7:9), the same size as in the DOCX
 
 
 def _e(text: str) -> str:
@@ -49,7 +52,7 @@ class _Styles:
         font = resolve_font(doc.font).family
         fs = doc.font_size
         accent = colors.HexColor(doc.accent)
-        centered = doc.template.entry_style == "title_first"
+        centered = doc.template.entry_style == "title_first" and not doc.photo  # left-align next to a photo
         self.accent_hex = doc.accent
         self.body = ParagraphStyle("body", fontName=font, fontSize=fs, leading=fs * 1.28, textColor=colors.black)
         self.name = ParagraphStyle(
@@ -184,17 +187,33 @@ def render_pdf(doc: RenderDoc) -> tuple[bytes, int]:
     st = _Styles(doc)
     dates_first = doc.template.entry_style == "dates_first"
 
-    story: list = []
+    header: list = []
     if doc.name:
-        story.append(Paragraph(f"<b>{_e(doc.name)}</b>", st.name))
+        header.append(Paragraph(f"<b>{_e(doc.name)}</b>", st.name))
     if doc.headline:
-        story.append(Paragraph(_e(doc.headline), st.headline))
+        header.append(Paragraph(_e(doc.headline), st.headline))
     if doc.contacts:
-        story.append(Paragraph(" | ".join(_link(c) for c in doc.contacts), st.contact))
+        header.append(Paragraph(" | ".join(_link(c) for c in doc.contacts), st.contact))
     if doc.details:
-        story.append(
+        header.append(
             Paragraph(" | ".join(f"<b>{_e(k)}:</b> {_e(v)}" for k, v in doc.details), st.contact)
         )
+    story: list = []
+    if doc.photo:
+        # header text left, photo right: one borderless row, so the text layer still reads top to bottom
+        pw, ph, gap = PHOTO_W, PHOTO_W * 9 / 7, 6 * mm
+        row = Table([[header or "", Image(io.BytesIO(doc.photo), width=pw, height=ph)]], colWidths=[width - pw - gap, pw + gap])
+        row.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(row)
+    else:
+        story.extend(header)
     story.append(Spacer(1, 4))
 
     for block in doc.blocks:
