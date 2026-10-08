@@ -1,4 +1,4 @@
-import { Check, ChevronDown, CloudOff, Copy, FilePlus2, Files, Pencil, Sparkle, TriangleAlert } from 'lucide-react'
+import { Check, ChevronDown, CloudOff, Copy, FilePlus2, Files, Pencil, Sparkle, TriangleAlert, WandSparkles } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import type { CvMeta } from '../types'
@@ -15,7 +15,7 @@ function ago(iso: string): string {
 
 /** Dropdown to switch between saved CVs (e.g. "Software Engineer", "DevOps") and create tailored copies. */
 export function CvSwitcher() {
-  const { storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, saveState } = useStore()
+  const { storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, saveState, openImport } = useStore()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -79,6 +79,17 @@ export function CvSwitcher() {
           </button>
           <button type="button" className="btn sm ghost" onClick={() => create('example')} disabled={busy}>
             <Sparkle size={14} /> Example
+          </button>
+          <button
+            type="button"
+            className="btn sm ghost"
+            onClick={() => {
+              setOpen(false)
+              openImport(true)
+            }}
+            disabled={busy}
+          >
+            <WandSparkles size={14} /> Upload CV with AI
           </button>
         </div>
         <p className="muted small">Tip: duplicate your main CV for each role (e.g. Software, DevOps), then set its Target job so the AI tailors the summary and bullets.</p>

@@ -1,7 +1,8 @@
-import { Bot, FileDown, Monitor, Moon, Sun, FileJson, FileText, FileUp, MoreHorizontal, Palette, RotateCcw, Sparkle, Undo2 } from 'lucide-react'
+import { Bot, FileDown, Monitor, Moon, Sun, FileJson, FileText, FileUp, MoreHorizontal, Palette, RotateCcw, Sparkle, Undo2, WandSparkles } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { api, fileName } from '../api'
-import { emptyCV, exampleCV, normalizeCV } from '../defaults'
+import { parseCvText } from '../cvImport'
+import { emptyCV, exampleCV } from '../defaults'
 import { useStore } from '../store'
 import type { TemplateKey } from '../types'
 import { useTheme, type ThemePref } from '../theme'
@@ -27,7 +28,7 @@ const FONTS = ['Calibri', 'Arial', 'Cambria', 'Times New Roman', 'Georgia']
 const ACCENTS = ['#1F3864', '#000000', '#1D4E89', '#0F5257', '#7A1F2B', '#4B3F72']
 
 export function TopBar() {
-  const { cv, mutate, replaceCV, undo, canUndo, templates, ai, aiReady, aiConfig, openAISettings, toast, storageMode, createDoc } = useStore()
+  const { cv, mutate, replaceCV, undo, canUndo, templates, ai, aiReady, aiConfig, openAISettings, openImport, importCV, toast, storageMode, createDoc } = useStore()
   const [designOpen, setDesignOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [busy, setBusy] = useState<'pdf' | 'docx' | null>(null)
@@ -57,18 +58,16 @@ export function TopBar() {
   }
 
   const importJSON = async (file: File) => {
-    try {
-      const data = normalizeCV(JSON.parse(await file.text()))
-      if (storageMode === 'server') {
-        await createDoc({ data }, file.name.replace(/\.json$/i, '').replace(/_/g, ' '))
-      } else {
-        replaceCV(data)
-      }
-      toast(`Imported ${file.name}`, 'success')
-    } catch {
-      toast('That file is not a valid CV Builder JSON export.', 'error')
-    }
+    if (fileRef.current) fileRef.current.value = '' // let the same file be picked again
     setMenuOpen(false)
+    try {
+      // also accepts the JSON an AI chat produced from "Upload CV with AI"
+      if (await importCV(parseCvText(await file.text()), file.name.replace(/\.(json|txt)$/i, '').replace(/_/g, ' '))) {
+        toast(`Imported ${file.name}`, 'success')
+      }
+    } catch (e) {
+      toast(`Couldn't import ${file.name}: ${(e as Error).message}`, 'error')
+    }
   }
 
   const setTemplate = (t: TemplateKey) => mutate((d) => void (d.design.template = t))
@@ -169,6 +168,16 @@ export function TopBar() {
             <MoreHorizontal size={18} />
           </button>
           <Popover open={menuOpen} onClose={() => setMenuOpen(false)} className="menu">
+            <button
+              type="button"
+              className="menu-item"
+              onClick={() => {
+                setMenuOpen(false)
+                openImport(true)
+              }}
+            >
+              <WandSparkles size={15} /> Upload CV with AI…
+            </button>
             <button type="button" className="menu-item" onClick={() => fileRef.current?.click()}>
               <FileUp size={15} /> Import JSON as new CV…
             </button>
@@ -199,7 +208,7 @@ export function TopBar() {
               <RotateCcw size={15} /> Clear this CV
             </button>
           </Popover>
-          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && importJSON(e.target.files[0])} />
+          <input ref={fileRef} type="file" accept="application/json,.json,text/plain,.txt" hidden onChange={(e) => e.target.files?.[0] && importJSON(e.target.files[0])} />
         </div>
 
         <div className="download-group">

@@ -34,6 +34,10 @@ interface Store {
   aiReady: boolean
   aiModalOpen: boolean
   openAISettings: (open?: boolean) => void
+  importOpen: boolean
+  openImport: (open?: boolean) => void
+  /** Add an imported CV: a new library entry (server) or replaces the browser-only CV (Undo restores it). */
+  importCV: (cv: CV, name: string) => Promise<boolean>
   toasts: Toast[]
   toast: (text: string, kind?: Toast['kind']) => void
   dismissToast: (id: number) => void
@@ -97,6 +101,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [aiConfig, setAIConfig] = useState<AIConfig | null>(null)
   const [savedKeys, setSavedKeys] = useState<SavedKey[]>([])
   const [aiModalOpen, setAIModalOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const lastSnapshot = useRef<number>(0)
   // the CV object last loaded from / written to the server – no need to save it again
@@ -327,6 +332,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     commit(h[h.length - 1])
   }, [])
 
+  const importCV = useCallback(
+    async (data: CV, name: string) => {
+      if (storageMode !== 'server') {
+        replaceCV(data)
+        return true
+      }
+      return (await createDoc({ data }, name.trim().slice(0, 120) || 'Imported CV')) !== null
+    },
+    [storageMode, createDoc, replaceCV],
+  )
+
   const setAI = useCallback((s: AISettings) => {
     setAIState(s)
     saveAISettings(s)
@@ -375,11 +391,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       aiReady,
       aiModalOpen,
       openAISettings: (open = true) => setAIModalOpen(open),
+      importOpen,
+      openImport: (open = true) => setImportOpen(open),
+      importCV,
       toasts,
       toast,
       dismissToast,
     }),
-    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, savedKeys, aiReady, aiModalOpen, toasts, toast, dismissToast],
+    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, savedKeys, aiReady, aiModalOpen, importOpen, importCV, toasts, toast, dismissToast],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

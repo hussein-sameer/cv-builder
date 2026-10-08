@@ -73,12 +73,15 @@ frontend/src/
   defaults.ts          uid(), emptyItem/newSection/emptyCV/exampleCV, normalizeCV (back-compat for old saves)
   storage.ts           localStorage/sessionStorage, namespaced per user id
   atsCheck.ts          Client-side ATS lint rules shown in the "ATS check" panel
+  cvImport.ts          "Upload CV with AI": the instruction users paste into an external AI chat, and parseCvText(),
+                       the lenient JSON -> CV importer (code fences, date formats, section aliases) used by every JSON import
   useAI.ts             Hook wrapping AI calls (readiness, busy flag, error toasts, low-quota notice)
   theme.ts             light/dark/system theme hook; index.html applies it before first paint
   styles.css           ALL styling; design tokens at the top, dark theme overrides in :root[data-theme='dark']
   components/          TopBar, CvSwitcher, AccountMenu, EditorCards (personal/target/add-section), SectionCard,
                        ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange),
-                       AiSettingsModal, PdfPreview, AtsPanel, ui (Modal, Popover, ConfirmDelete, Spinner)
+                       AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), PdfPreview, AtsPanel,
+                       ui (Modal, Popover, ConfirmDelete, Spinner)
 ```
 
 ## How it works
@@ -153,7 +156,9 @@ in `db.SCHEMA`; there is no migration framework.
    no SQLite-only pragmas outside `db.py`. `INSERT ... ON CONFLICT ... DO UPDATE ... RETURNING` is fine.
    Schema changes must be idempotent (`CREATE ... IF NOT EXISTS`; add columns with a guarded `ALTER`).
 7. **AI prompts must not invent facts.** Keep the "use only facts in the CV" and placeholder rules when
-   editing `prompts.py`.
+   editing `prompts.py`, and the "copy my wording exactly, add nothing" rules in `cvImport.AI_IMPORT_PROMPT`.
+   If you change the CV schema, update that prompt's format block and `parseCvText` too, and keep a
+   CV Builder JSON export importing unchanged.
 8. **pdf.js must use the legacy build** (`pdfjs-dist/legacy/build/pdf.mjs` + its worker). The modern
    v6 build calls `Map.prototype.getOrInsertComputed`, which many browsers lack, so the preview breaks.
 9. **No blocking browser dialogs** (`alert/confirm/prompt`). Use `ConfirmDelete` (two-step button) or

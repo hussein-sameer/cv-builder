@@ -1,9 +1,10 @@
-import { AlertCircle, CheckCircle2, Eye, PencilLine, ShieldCheck, Sparkle, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Eye, PencilLine, ShieldCheck, Sparkle, WandSparkles, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { atsCheck } from './atsCheck'
 import { AiSettingsModal } from './components/AiSettingsModal'
 import { AtsPanel } from './components/AtsPanel'
 import { AddSection, PersonalCard, TargetCard } from './components/EditorCards'
+import { ImportCvModal } from './components/ImportCvModal'
 import { SectionCard } from './components/SectionCard'
 import { TopBar } from './components/TopBar'
 import { exampleCV } from './defaults'
@@ -24,7 +25,7 @@ export default function App() {
 }
 
 function Shell() {
-  const { cv, replaceCV, undo, toasts, dismissToast, storageMode, createDoc, docId } = useStore()
+  const { cv, replaceCV, undo, toasts, dismissToast, storageMode, createDoc, docId, openImport } = useStore()
   const [pages, setPages] = useState<number | null>(null)
   const [tab, setTab] = useState<'edit' | 'preview'>('edit')
   const [atsOpen, setAtsOpen] = useState(false)
@@ -81,17 +82,21 @@ function Shell() {
                 <h2>Build an ATS-friendly CV</h2>
                 <p>
                   Fill in the cards below — the preview on the right is the exact PDF you'll download. Add sections with <strong>Add section</strong>, reorder them with
-                  the arrows, and use <strong>✨ Generate with AI</strong> to draft your summary.
+                  the arrows, and use <strong>✨ Generate with AI</strong> to draft your summary. Already have a CV? <strong>Upload CV with AI</strong> fills it in
+                  for you.
                 </p>
+                <div className="welcome-actions">
+                  <button type="button" className="btn ai" onClick={() => openImport(true)}>
+                    <WandSparkles size={15} /> Upload CV with AI
+                  </button>
+                  <button type="button" className="btn" onClick={() => (storageMode === 'server' ? void createDoc('example', 'Example CV') : replaceCV(exampleCV()))}>
+                    <Sparkle size={15} /> Load example
+                  </button>
+                </div>
               </div>
-              <div className="welcome-actions">
-                <button type="button" className="btn" onClick={() => (storageMode === 'server' ? void createDoc('example', 'Example CV') : replaceCV(exampleCV()))}>
-                  <Sparkle size={15} /> Load example
-                </button>
-                <button type="button" className="icon-btn" aria-label="Dismiss" onClick={() => setWelcomeDismissed(true)}>
-                  <X size={16} />
-                </button>
-              </div>
+              <button type="button" className="icon-btn" aria-label="Dismiss" onClick={() => setWelcomeDismissed(true)}>
+                <X size={16} />
+              </button>
             </div>
           )}
           {storageMode !== 'loading' && (
@@ -117,6 +122,7 @@ function Shell() {
       </main>
 
       <AiSettingsModal />
+      <ImportCvModal />
 
       <div className="toasts" aria-live="polite">
         {toasts.map((t) => (
