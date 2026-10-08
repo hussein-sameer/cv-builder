@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 196 40" width="196" height="40" role="img" aria-label="CV Builder">
+  <style>
+    .word { font: 700 22px Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; fill: #1d2433; letter-spacing: -0.2px; }
+    .word tspan { fill: #3949ab; }
+    @media (prefers-color-scheme: dark) { .word { fill: #e7eaf0; } .word tspan { fill: #a3aeff; } }
+  </style>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3949ab"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(2 4)">
+    <path d="M8 0h14l10 10v14a8 8 0 0 1-8 8H8a8 8 0 0 1-8-8V8a8 8 0 0 1 8-8Z" fill="url(#g)"/>
+    <path d="M22 0v6a4 4 0 0 0 4 4h6Z" fill="#c7d2fe"/>
+    <path d="M13.4 12.2a5.2 5.2 0 1 0 0 9.6" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M16.3 11.6l3.4 10.8 3.4-10.8" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text class="word" x="44" y="28"><tspan>CV</tspan> Builder</text>
+</svg>

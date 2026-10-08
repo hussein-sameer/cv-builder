@@ -76,7 +76,9 @@ export function TopBar() {
     <header className="topbar">
       <div className="brand">
         <img src="/favicon.svg" alt="" width={26} height={26} />
-        <span className="brand-name">CV Builder</span>
+        <span className="brand-name">
+          <span className="brand-cv">CV</span> Builder
+        </span>
       </div>
       <CvSwitcher />
 

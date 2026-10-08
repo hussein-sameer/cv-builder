@@ -124,6 +124,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
   background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20;
 }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; white-space: nowrap; }
+.brand-cv { color: var(--primary-text); }
 .save-state { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: var(--muted); padding: 2px 8px; border-radius: 99px; background: var(--bg); }
 .save-state.ok { color: var(--ok); }
 .save-state.err { color: var(--danger); background: var(--danger-soft); }

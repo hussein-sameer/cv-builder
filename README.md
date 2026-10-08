@@ -1,3 +1,5 @@
+<img src="frontend/public/logo.svg" alt="CV Builder" height="40">
+
 # CV Builder
 
 A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF**, with an AI helper that drafts your profile summary and rewrites bullet points using the provider you choose: OpenAI-compatible APIs, Anthropic, Google Gemini or a local Ollama model. It supports multiple users, each with their own private CV library, and can be hosted for free (see [Free hosting on Northflank](#free-hosting-on-northflank)).

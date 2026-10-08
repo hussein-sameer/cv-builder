@@ -78,6 +78,9 @@ frontend/src/
   useAI.ts             Hook wrapping AI calls (readiness, busy flag, error toasts, low-quota notice)
   theme.ts             light/dark/system theme hook; index.html applies it before first paint
   styles.css           ALL styling; design tokens at the top, dark theme overrides in :root[data-theme='dark']
+  ../public/           favicon.svg (tab icon, also the header/login mark), logo.svg (mark + wordmark),
+                       favicon.ico + apple-touch-icon.png rendered from favicon.svg: regenerate both if it changes
+                       and bump the ?v= in index.html so browsers drop the cached icon
   components/          TopBar, CvSwitcher, AccountMenu, EditorCards (personal/target/add-section), SectionCard,
                        ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange),
                        AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), PdfPreview, AtsPanel,

@@ -124,7 +124,9 @@ function AuthScreen({ config, notice, onIn }: { config: AuthConfig; notice?: str
         <div className="auth-brand">
           <img src="/favicon.svg" alt="" width={36} height={36} />
           <div>
-            <h1>CV Builder</h1>
+            <h1>
+              <span className="brand-cv">CV</span> Builder
+            </h1>
             <p className="muted small">ATS-friendly CVs in DOCX and PDF, with an AI writing helper</p>
           </div>
         </div>
