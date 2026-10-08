@@ -189,7 +189,8 @@ migration framework.
    default heading in `_COMMON_HEADINGS` (or per template); `TAGS_LABEL` if it has tags.
 3. `frontend/src/types.ts`: add to `SectionType`.
 4. `frontend/src/sectionTypes.ts`: add a `SectionTypeDef` (label, icon, kind, fields, addLabel,
-   `multiple`, optional `aiBullets`/`tip`) and put it in `ADDABLE_ORDER`.
+   `multiple`, optional `aiBullets`/`tip`) and put it in `ADDABLE_ORDER`. `multiple: false` unless it is a
+   user-named section: a CV has one Experience, one Skills and so on, and the picker greys out a type it already has.
 5. If prompts should see it differently, check `ai/prompts.py::cv_to_text` (handles kinds generically).
 6. Add/adjust a test in `tests/test_export.py`.
 

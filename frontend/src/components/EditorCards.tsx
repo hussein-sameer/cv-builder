@@ -191,6 +191,7 @@ export function AddSection() {
   const { cv, mutate } = useStore()
   const [open, setOpen] = useState(false)
   const present = new Set(cv.sections.map((s) => s.type))
+  const shown = new Set(cv.sections.filter((s) => s.visible).map((s) => s.type))
 
   const add = (type: SectionType) => {
     const s = newSection(type)
@@ -221,7 +222,7 @@ export function AddSection() {
                 </span>
                 <span>
                   <strong>{def.label}</strong>
-                  <small>{used ? 'Already in your CV' : def.description}</small>
+                  <small>{!used ? def.description : shown.has(t) ? 'Already in your CV' : 'Already in your CV (hidden)'}</small>
                 </span>
               </button>
             )
