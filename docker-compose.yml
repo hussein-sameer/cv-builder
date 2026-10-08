@@ -1,0 +1,19 @@
+services:
+  cv-builder:
+    build: .
+    image: cv-builder:latest
+    ports:
+      - "127.0.0.1:8000:8000"   # reachable from this machine only
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ALLOW_PRIVATE_BASE_URLS: "true"   # local install: allow Ollama / LM Studio on your machine
+    volumes:
+      - cv-data:/data           # saved CV library (SQLite) when DATABASE_URL isn't set
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach Ollama / LM Studio running on the host
+    restart: unless-stopped
+
+volumes:
+  cv-data:

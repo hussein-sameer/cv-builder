@@ -1,0 +1,55 @@
+{
+  "personal": {
+    "fullName": "Alex Morgan",
+    "headline": "Senior Network Engineer",
+    "email": "alex.morgan@example.com",
+    "phone": "+44 7700 900123",
+    "location": "Manchester, UK",
+    "linkedin": "https://www.linkedin.com/in/alexmorgan",
+    "github": "github.com/alexmorgan",
+    "website": "",
+    "nationality": "British",
+    "dateOfBirth": "",
+    "workPermit": "Eligible to work in the UK and EU",
+    "drivingLicence": "B"
+  },
+  "sections": [
+    {"id": "s1", "type": "summary", "title": "", "visible": true,
+     "content": "Network engineer with 7 years of experience running fibre access networks. Cut mean time to repair by 30% by automating fault triage with Python."},
+    {"id": "s2", "type": "experience", "title": "", "visible": true, "items": [
+      {"id": "e1", "title": "Senior Network Engineer", "organization": "Northwind Fibre", "location": "Manchester, UK",
+       "startDate": "2021-03", "endDate": "", "current": true,
+       "bullets": ["Lead a team of 6 engineers maintaining 4,000 km of FTTH network across the North West.",
+                   "Automated OTDR fault localisation with Python and Kafka, cutting mean time to repair by 30%.",
+                   "Responsible for vendor coordination during major outages."],
+       "tags": ["Python", "Kafka", "PostgreSQL", "Grafana"]},
+      {"id": "e2", "title": "Network Engineer", "organization": "Contoso Telecom", "location": "Leeds, UK",
+       "startDate": "2018-01", "endDate": "2021-02", "current": false,
+       "description": "Field and NOC engineering for metro Ethernet and GPON.",
+       "bullets": ["Built Grafana dashboards tracking fibre cuts and repair SLAs for 200k subscribers."]}
+    ]},
+    {"id": "s3", "type": "education", "title": "", "visible": true, "items": [
+      {"id": "d1", "title": "BEng Electronic and Communications Engineering", "organization": "University of Leeds",
+       "location": "Leeds, UK", "startDate": "2013-09", "endDate": "2017-06", "grade": "First Class Honours"}
+    ]},
+    {"id": "s4", "type": "skills", "title": "", "visible": true, "items": [
+      {"id": "k1", "title": "Networking", "tags": ["FTTH", "GPON", "OTDR", "BGP", "OSPF"]},
+      {"id": "k2", "title": "Software", "tags": ["Python", "Django", "React", "PostgreSQL/PostGIS"]}
+    ]},
+    {"id": "s5", "type": "certifications", "title": "", "visible": true, "items": [
+      {"id": "c1", "title": "Certified Fiber Optic Technician (CFOT)", "organization": "FOA", "date": "2021"}
+    ]},
+    {"id": "s6", "type": "languages", "title": "", "visible": true, "items": [
+      {"id": "l1", "title": "English", "level": "Native"},
+      {"id": "l2", "title": "German", "level": "B1 – Intermediate"}
+    ]},
+    {"id": "s7", "type": "projects", "title": "", "visible": true, "items": [
+      {"id": "p1", "title": "Outage Analytics Pipeline", "organization": "Personal project", "link": "github.com/alexmorgan/outages",
+       "startDate": "2024", "endDate": "2025", "bullets": ["Ingests public outage reports and classifies root causes with an LLM."],
+       "tags": ["FastAPI", "LangChain"]}
+    ]},
+    {"id": "s8", "type": "interests", "title": "", "visible": false, "content": "Hidden section"}
+  ],
+  "design": {"template": "international", "fontSize": 10.5, "accentColor": "#1F3864", "pageSize": "A4"},
+  "target": {"role": "Network Automation Engineer", "jobDescription": "We need Python, Ansible and fibre network experience."}
+}
