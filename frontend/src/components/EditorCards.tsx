@@ -133,8 +133,7 @@ function PhotoField() {
             )}
           </div>
           <span className="field-hint">
-            Printed at the top right of the CV, cropped to passport shape: use a head-and-shoulders photo. Expected in some countries (e.g. Germany, Austria,
-            Switzerland, much of the Middle East and Asia); leave it out for the UK, Ireland, the US and Canada.
+            Printed at the top right of the CV, cropped to passport shape: use a head-and-shoulders photo.
           </span>
         </div>
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
