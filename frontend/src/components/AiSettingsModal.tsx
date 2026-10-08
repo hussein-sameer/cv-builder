@@ -1,10 +1,10 @@
 import { CheckCircle2, Eye, EyeOff, RefreshCw, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { useStore } from '../store'
-import type { AISettings, ProviderInfo } from '../types'
+import { savedKeyFor, useStore } from '../store'
+import type { AISettings, ProviderInfo, ProviderType, SavedKey } from '../types'
 import { Field, TextInput } from './fields'
-import { Modal, Spinner } from './ui'
+import { ConfirmDelete, Modal, Spinner } from './ui'
 
 const FALLBACK: ProviderInfo[] = [
   { type: 'openai', label: 'OpenAI-compatible', hint: 'OpenAI, OpenRouter, Groq, DeepSeek, LM Studio…', needsKey: true, presets: [], defaultBaseUrl: 'https://api.openai.com/v1', defaultModel: '', serverKey: false },
@@ -16,11 +16,12 @@ const FALLBACK: ProviderInfo[] = [
 const MODEL_HINT = 'Type a model ID or click “Load models”'
 
 export function AiSettingsModal() {
-  const { ai, setAI, aiConfig, aiModalOpen, openAISettings, toast } = useStore()
+  const { ai, setAI, aiConfig, savedKeys, setSavedKeys, aiModalOpen, openAISettings, toast } = useStore()
   const [draft, setDraft] = useState<AISettings>(ai)
   const [showKey, setShowKey] = useState(false)
   const [models, setModels] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
   const [advanced, setAdvanced] = useState(false)
 
@@ -36,6 +37,9 @@ export function AiSettingsModal() {
   const p = draft.providers[draft.active]
   const setP = (patch: Partial<typeof p>) =>
     setDraft({ ...draft, providers: { ...draft.providers, [draft.active]: { ...p, ...patch } } })
+  const accountKeys = !!aiConfig?.keyStorage
+  const saved = savedKeyFor(savedKeys, draft.active, p, info)
+  const infoFor = (t: ProviderType) => providers.find((x) => x.type === t)
 
   const loadModels = async () => {
     setLoading(true)
@@ -52,8 +56,42 @@ export function AiSettingsModal() {
     }
   }
 
-  const save = () => {
-    setAI(draft)
+  const removeKey = async (k: SavedKey) => {
+    try {
+      await api.deleteAIKey(k.id)
+      setSavedKeys(savedKeys.filter((x) => x.id !== k.id))
+      toast('Saved key removed from your account', 'success')
+    } catch (e) {
+      toast((e as Error).message, 'error')
+    }
+  }
+
+  const save = async () => {
+    const next: AISettings = structuredClone(draft)
+    if (accountKeys) {
+      next.remember = false // keys live on the account or in this tab, never in localStorage
+      if (next.keysInAccount) {
+        // move every typed key to the account, bound to the endpoint it was typed for
+        let keys = savedKeys
+        setSaving(true)
+        try {
+          for (const t of Object.keys(next.providers) as ProviderType[]) {
+            const pr = next.providers[t]
+            if (!pr.apiKey.trim()) continue
+            const rec = await api.saveAIKey(t, pr.baseUrl, pr.apiKey)
+            keys = [...keys.filter((k) => k.id !== rec.id), rec]
+            pr.apiKey = ''
+          }
+        } catch (e) {
+          setStatus({ ok: false, text: `Couldn't save your key: ${(e as Error).message}` })
+          return
+        } finally {
+          setSaving(false)
+          setSavedKeys(keys)
+        }
+      }
+    }
+    setAI(next)
     openAISettings(false)
     toast(`AI provider set to ${info.label}${p.model ? ` · ${p.model}` : ''}`, 'success')
   }
@@ -71,8 +109,8 @@ export function AiSettingsModal() {
           <button type="button" className="btn ghost" onClick={() => openAISettings(false)}>
             Cancel
           </button>
-          <button type="button" className="btn primary" onClick={save}>
-            Save
+          <button type="button" className="btn primary" onClick={() => void save()} disabled={saving}>
+            {saving && <Spinner />} Save
           </button>
         </>
       }
@@ -92,7 +130,8 @@ export function AiSettingsModal() {
             }}
           >
             <strong>{pr.label}</strong>
-            {(draft.providers[pr.type].apiKey || pr.serverKey || !pr.needsKey) && (draft.providers[pr.type].model || pr.defaultModel) ? (
+            {(draft.providers[pr.type].apiKey || savedKeyFor(savedKeys, pr.type, draft.providers[pr.type], pr) || pr.serverKey || !pr.needsKey) &&
+            (draft.providers[pr.type].model || pr.defaultModel) ? (
               <small className="ok">● configured</small>
             ) : (
               <small>not set</small>
@@ -139,12 +178,28 @@ export function AiSettingsModal() {
           </Field>
         )}
         {info.needsKey && (
-          <Field label="API key" span={2} hint={info.serverKey ? 'A key is configured on the server — leave empty to use it.' : undefined}>
+          <Field
+            label="API key"
+            span={2}
+            hint={
+              saved
+                ? `Saved to your account (${saved.hint}). Leave empty to use it, or paste a new key to replace it.`
+                : info.serverKey
+                  ? 'A key is configured on the server — leave empty to use it.'
+                  : undefined
+            }
+          >
             <div className="input-with-btn">
-              <TextInput type={showKey ? 'text' : 'password'} value={p.apiKey} onChange={(v) => setP({ apiKey: v.trim() })} placeholder={info.serverKey ? 'Using server key' : 'Paste your API key'} />
+              <TextInput
+                type={showKey ? 'text' : 'password'}
+                value={p.apiKey}
+                onChange={(v) => setP({ apiKey: v.trim() })}
+                placeholder={saved ? `Using your saved key ${saved.hint}` : info.serverKey ? 'Using server key' : 'Paste your API key'}
+              />
               <button type="button" className="icon-btn" aria-label={showKey ? 'Hide key' : 'Show key'} onClick={() => setShowKey(!showKey)}>
                 {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
+              {saved && <ConfirmDelete title="Remove saved key" onConfirm={() => void removeKey(saved)} />}
             </div>
           </Field>
         )}
@@ -185,14 +240,41 @@ export function AiSettingsModal() {
         </p>
       )}
 
-      <label className="check">
-        <input type="checkbox" checked={draft.remember} onChange={(e) => setDraft({ ...draft, remember: e.target.checked })} />
-        Remember API keys on this device
-      </label>
+      {accountKeys ? (
+        <label className="check">
+          <input type="checkbox" checked={draft.keysInAccount} onChange={(e) => setDraft({ ...draft, keysInAccount: e.target.checked })} />
+          Save API keys to my account, so they work on any device
+        </label>
+      ) : (
+        <label className="check">
+          <input type="checkbox" checked={draft.remember} onChange={(e) => setDraft({ ...draft, remember: e.target.checked })} />
+          Remember API keys on this device
+        </label>
+      )}
+      {savedKeys.length > 0 && (
+        <div className="saved-keys">
+          <span className="field-label">Keys saved to your account</span>
+          <ul>
+            {savedKeys.map((k) => (
+              <li key={k.id}>
+                <span>
+                  {infoFor(k.provider)?.label ?? k.provider} · <span className="muted">{k.baseUrl.replace(/^https?:\/\//, '')}</span>
+                </span>
+                <code>{k.hint}</code>
+                <ConfirmDelete title="Remove saved key" size={14} onConfirm={() => void removeKey(k)} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="privacy">
         <ShieldCheck size={15} />
         <span>
-          Keys go only to your own CV Builder server, which forwards them to the provider and never stores or logs them. Unless “Remember” is ticked they are kept for this browser tab only.
+          {accountKeys && draft.keysInAccount
+            ? 'Saved keys are encrypted on your CV Builder server and tied to your account. Each one is only ever sent to the endpoint it was saved for, and is never shown again (just its last 4 characters).'
+            : accountKeys
+              ? 'Keys go only to your own CV Builder server, which forwards them to the provider and never stores or logs them. They are kept for this browser tab only.'
+              : 'Keys go only to your own CV Builder server, which forwards them to the provider and never stores or logs them. Unless “Remember” is ticked they are kept for this browser tab only.'}
         </span>
       </p>
     </Modal>

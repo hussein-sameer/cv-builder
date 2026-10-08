@@ -1,4 +1,4 @@
-import type { AIConfig, AuthConfig, CV, CvMeta, CvRecord, GenerateOptions, ProviderSettings, ProviderType, SessionUser, TemplateInfo } from './types'
+import type { AIConfig, AuthConfig, CV, CvMeta, CvRecord, GenerateOptions, ProviderSettings, ProviderType, SavedKey, SessionUser, TemplateInfo } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') ?? ''
 
@@ -85,6 +85,13 @@ export const api = {
   // ---- meta / export / AI
   meta: () => getJSON<{ templates: TemplateInfo[]; pdfFonts: Record<string, string> }>('/api/meta'),
   aiConfig: () => getJSON<AIConfig>('/api/ai/config'),
+  aiKeys: () => getJSON<SavedKey[]>('/api/ai/keys'),
+  async saveAIKey(type: ProviderType, baseUrl: string, apiKey: string): Promise<SavedKey> {
+    return (await request('PUT', '/api/ai/keys', { provider: { type, baseUrl, apiKey } })).json()
+  },
+  async deleteAIKey(id: string): Promise<void> {
+    await request('DELETE', `/api/ai/keys/${encodeURIComponent(id)}`)
+  },
 
   async previewPdf(cv: CV, signal?: AbortSignal): Promise<{ data: ArrayBuffer; pages: number }> {
     const res = await post('/api/export/pdf?inline=true', cv, signal)

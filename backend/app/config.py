@@ -47,6 +47,7 @@ class Settings:
     admin_emails: frozenset[str] = frozenset()
     session_days: int = 30
     cookie_secure: str = "auto"  # auto | true | false
+    secret_key: str = ""  # encrypts users' saved AI keys; required for saving them on Postgres
     # --- AI
     ai_daily_limit: int = 30  # per user per UTC day when the *server* key is used; 0 = unlimited
     allow_private_base_urls: bool = False
@@ -72,6 +73,7 @@ def load_settings() -> Settings:
         admin_emails=frozenset(e.strip().lower() for e in env("ADMIN_EMAILS", "").split(",") if e.strip()),
         session_days=int(env("SESSION_DAYS", "30")),
         cookie_secure=env("COOKIE_SECURE", "auto").strip().lower(),
+        secret_key=env("SECRET_KEY", "").strip(),
         ai_daily_limit=int(env("AI_DAILY_LIMIT", "30")),
         # Block AI base URLs that resolve to private/internal IPs on a public, multi-user server (SSRF).
         allow_private_base_urls=_bool("ALLOW_PRIVATE_BASE_URLS", not auth_enabled),

@@ -45,6 +45,18 @@ SCHEMA = [
         count   INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, day)
     )""",
+    # users' own AI keys, AES-GCM encrypted (see ai/keys.py); each is bound to one base URL
+    """CREATE TABLE IF NOT EXISTS ai_keys (
+        id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL,
+        provider   TEXT NOT NULL,
+        base_url   TEXT NOT NULL,
+        key_enc    TEXT NOT NULL,
+        hint       TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (user_id, provider, base_url)
+    )""",
 ]
 POST_SCHEMA = ["CREATE INDEX IF NOT EXISTS cvs_user_idx ON cvs (user_id, updated_at)"]
 

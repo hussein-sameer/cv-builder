@@ -71,6 +71,11 @@ export function clearUserLocalData(everything = false): void {
   }
 }
 
+/** Whether this browser has AI settings yet (false on a new device or browser). */
+export function hasLocalAISettings(): boolean {
+  return !!(safeGet(localStorage, key('ai')) ?? safeGet(localStorage, BASE_KEYS.ai))
+}
+
 /**
  * AI settings live in localStorage. API keys go to localStorage only when the
  * user ticks "Remember"; otherwise they're kept for this browser tab session.

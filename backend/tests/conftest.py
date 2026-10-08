@@ -12,7 +12,7 @@ from app import auth, config, db
 from app.main import app
 
 SAMPLE = json.loads((Path(__file__).parent / "sample_cv.json").read_text())
-TABLES = ("ai_usage", "sessions", "cvs", "users")
+TABLES = ("ai_keys", "ai_usage", "sessions", "cvs", "users")
 BACKENDS = ["sqlite"] + (["postgres"] if os.getenv("TEST_DATABASE_URL") else [])
 
 
@@ -41,7 +41,7 @@ def settings(monkeypatch):
         monkeypatch.setattr(config, "settings", replace(config.settings, **kw))
 
     apply(auth_enabled=True, signup_enabled=True, allow_private_base_urls=True, ai_daily_limit=30,
-          admin_emails=frozenset(), cookie_secure="auto")
+          admin_emails=frozenset(), cookie_secure="auto", secret_key="")
     return apply
 
 

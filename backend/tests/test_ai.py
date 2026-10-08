@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from app import config
-from app.ai import prompts, providers
+from app.ai import keys, prompts, providers
 from app.ai import router as ai_router
 from app.config import ProviderDefaults
 from tests.conftest import signup
@@ -223,3 +223,141 @@ def test_private_addresses_blocked_when_hosted(client, fake, monkeypatch):
     monkeypatch.setattr(providers, "_host_ips", lambda host: {"93.184.216.34"})
     r = gen(client, {"type": "openai", "baseUrl": "https://api.example.com/v1", "apiKey": "k", "model": "m"})
     assert r.status_code == 200
+
+
+# --------------------------------------------------------------------------- per-user saved keys
+OR_URL = "https://openrouter.ai/api/v1"
+MY_KEY = "sk-or-v1-0123456789abcd"
+
+
+def save_key(client, provider):
+    return client.put("/api/ai/keys", json={"provider": provider})
+
+
+def test_saved_key_is_used_and_never_returned(client, fake, settings, database):
+    settings(secret_key="test-secret")
+    r = save_key(client, {"type": "openai", "baseUrl": OR_URL + "/", "apiKey": MY_KEY})
+    assert r.status_code == 200, r.text
+    saved = r.json()
+    assert saved["baseUrl"] == OR_URL and saved["hint"] == "••••abcd" and saved["provider"] == "openai"
+    listed = client.get("/api/ai/keys").json()
+    assert [k["id"] for k in listed] == [saved["id"]]
+    assert MY_KEY not in json.dumps(listed) + json.dumps(client.get("/api/ai/config").json())
+    with database.tx() as c:
+        assert MY_KEY not in c.one("SELECT key_enc FROM ai_keys")["key_enc"]  # encrypted at rest
+
+    rec = fake(ok_chat())
+    assert gen(client, {"type": "openai", "baseUrl": OR_URL, "model": "m"}).status_code == 200
+    assert rec.requests[-1].headers["authorization"] == f"Bearer {MY_KEY}"
+    # a key typed in the request still wins
+    gen(client, {"type": "openai", "baseUrl": OR_URL, "apiKey": "typed", "model": "m"})
+    assert rec.requests[-1].headers["authorization"] == "Bearer typed"
+    # model listing uses it too
+    fake(lambda r: httpx.Response(200, json={"data": [{"id": "a"}]}))
+    assert client.post("/api/ai/models", json={"provider": {"type": "openai", "baseUrl": OR_URL}}).json()["models"] == ["a"]
+
+
+def test_saved_key_only_goes_to_its_own_base_url(client, fake, settings, database):
+    settings(secret_key="test-secret")
+    save_key(client, {"type": "openai", "baseUrl": OR_URL, "apiKey": MY_KEY})
+    rec = fake(ok_chat())
+    assert gen(client, {"type": "openai", "baseUrl": "https://attacker.example/v1", "model": "m"}).status_code == 200
+    assert "authorization" not in rec.requests[-1].headers
+    # rebinding the stored ciphertext to another URL in the database doesn't work either
+    with database.tx() as c:
+        c.execute("UPDATE ai_keys SET base_url = ?", ("https://attacker.example/v1",))
+    r = gen(client, {"type": "openai", "baseUrl": "https://attacker.example/v1", "model": "m"})
+    assert r.status_code == 400 and "can't be read" in r.json()["detail"]
+    assert len(rec.requests) == 1
+
+
+def test_saved_key_beats_shared_key_and_is_not_limited(client, fake, settings, server_key, monkeypatch):
+    settings(secret_key="test-secret")
+    monkeypatch.setattr(config, "settings", replace(config.settings, ai_daily_limit=1))
+    assert save_key(client, {"type": "openai", "apiKey": MY_KEY}).json()["baseUrl"] == "https://api.openai.com/v1"
+    rec = fake(ok_chat())
+    for _ in range(3):
+        r = gen(client, {"type": "openai"})
+        assert r.status_code == 200 and r.json()["remaining"] is None
+        assert rec.requests[-1].headers["authorization"] == f"Bearer {MY_KEY}"
+
+
+def test_saved_keys_are_private_to_each_user(client, fake, settings):
+    settings(secret_key="test-secret")
+    mine = save_key(client, {"type": "anthropic", "apiKey": MY_KEY}).json()
+    other = signup(type(client)(client.app), email="sam@example.com")
+    assert other.get("/api/ai/keys").json() == []
+    r = gen(other, {"type": "anthropic", "model": "m"})
+    assert r.status_code == 400 and "API key" in r.json()["detail"]
+    assert other.delete(f"/api/ai/keys/{mine['id']}").status_code == 404
+    assert len(client.get("/api/ai/keys").json()) == 1
+
+
+def test_replace_and_delete_saved_key(client, fake, settings):
+    settings(secret_key="test-secret")
+    first = save_key(client, {"type": "gemini", "apiKey": "first-key-0000"}).json()
+    second = save_key(client, {"type": "gemini", "apiKey": "second-key-1111"}).json()
+    assert first["id"] == second["id"] and second["hint"] == "••••1111"
+    rec = fake(lambda r: httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": SUMMARY}]}}]}))
+    assert gen(client, {"type": "gemini", "model": "g"}).status_code == 200
+    assert rec.requests[-1].headers["x-goog-api-key"] == "second-key-1111"
+    assert client.delete(f"/api/ai/keys/{first['id']}").status_code == 204
+    assert client.get("/api/ai/keys").json() == []
+    r = gen(client, {"type": "gemini", "model": "g"})
+    assert r.status_code == 400 and "API key" in r.json()["detail"] and len(rec.requests) == 1
+
+
+def test_save_key_validation(client, settings, monkeypatch):
+    settings(secret_key="test-secret")
+    assert save_key(client, {"type": "openai", "apiKey": "  "}).status_code == 400
+    assert save_key(client, {"type": "openai", "baseUrl": "ftp://x", "apiKey": MY_KEY}).status_code == 400
+    settings(allow_private_base_urls=False)
+    monkeypatch.setattr(providers, "_host_ips", lambda host: {"10.0.0.5"})
+    r = save_key(client, {"type": "openai", "baseUrl": "https://intranet.example/v1", "apiKey": MY_KEY})
+    assert r.status_code == 400 and "private" in r.json()["detail"]
+    monkeypatch.setattr(providers, "_host_ips", lambda host: {"93.184.216.34"})
+    monkeypatch.setattr(keys, "MAX_KEYS_PER_USER", 1)
+    assert save_key(client, {"type": "openai", "apiKey": MY_KEY}).status_code == 200
+    assert save_key(client, {"type": "openai", "apiKey": "replacing-is-fine"}).status_code == 200
+    r = save_key(client, {"type": "anthropic", "apiKey": MY_KEY})
+    assert r.status_code == 400 and "up to 1" in r.json()["detail"]
+
+
+def test_key_file_fallback_for_sqlite(client, fake, settings, database):
+    if database.kind != "sqlite":
+        pytest.skip("key file is only used with SQLite")
+    assert client.get("/api/ai/config").json()["keyStorage"] is True
+    assert save_key(client, {"type": "anthropic", "apiKey": MY_KEY}).status_code == 200
+    key_file = Path(database.path).parent / "secret.key"
+    assert key_file.stat().st_mode & 0o777 == 0o600
+    rec = fake(lambda r: httpx.Response(200, json={"content": [{"type": "text", "text": SUMMARY}]}))
+    assert gen(client, {"type": "anthropic", "model": "c"}).status_code == 200
+    assert rec.requests[-1].headers["x-api-key"] == MY_KEY
+    # a different master key can't read it: the user is asked to paste it again
+    settings(secret_key="a-new-secret")
+    r = gen(client, {"type": "anthropic", "model": "c"})
+    assert r.status_code == 400 and "Paste it again" in r.json()["detail"]
+
+
+def test_postgres_needs_secret_key_to_save(client, settings, monkeypatch):
+    monkeypatch.setattr(keys, "_key_file", lambda: None)  # as on Postgres
+    assert client.get("/api/ai/config").json()["keyStorage"] is False
+    r = save_key(client, {"type": "openai", "apiKey": MY_KEY})
+    assert r.status_code == 503 and "SECRET_KEY" in r.json()["detail"]
+    settings(secret_key="test-secret")
+    assert client.get("/api/ai/config").json()["keyStorage"] is True
+    assert save_key(client, {"type": "openai", "apiKey": MY_KEY}).status_code == 200
+
+
+def test_saved_keys_deleted_with_account(client, settings, database):
+    settings(secret_key="test-secret")
+    save_key(client, {"type": "openai", "apiKey": MY_KEY})
+    assert client.post("/api/auth/delete-account", json={"password": "correct horse"}).status_code == 200
+    with database.tx() as c:
+        assert c.one("SELECT COUNT(*) AS n FROM ai_keys")["n"] == 0
+
+
+def test_saved_keys_require_login(anon):
+    assert anon.get("/api/ai/keys").status_code == 401
+    assert anon.put("/api/ai/keys", json={"provider": {"type": "openai", "apiKey": "k"}}).status_code == 401
+    assert anon.delete("/api/ai/keys/abc").status_code == 401

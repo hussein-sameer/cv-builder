@@ -58,6 +58,7 @@ backend/app/
   storage.py       CV library CRUD, always scoped by user_id;  cvs_router.py = /api/cvs routes
   manage.py        Admin CLI (no email password reset exists)
   ai/providers.py  Raw-REST adapters: openai-compatible, anthropic, gemini, ollama; resolve() = key/base-URL policy + SSRF guard
+  ai/keys.py       Per-user saved API keys: AES-256-GCM (SECRET_KEY or SQLite-side secret.key), bound to user+provider+base URL
   ai/prompts.py    Prompt builders (summary, bullets), CV -> plain text, output cleaners
   ai/router.py     /api/ai/* routes, shared-key daily limit
 backend/tests/     pytest; conftest.py has the fixtures (see Testing)
@@ -114,12 +115,20 @@ daily limit). Throttles are in-memory (fine: production runs a single instance).
 
 **AI.** `resolve()` merges the request's provider settings with server env defaults. A blank
 `baseUrl` on the client means "server default endpoint", which is the only case where the server's key
-is used. Shared-key generations are counted in `ai_usage` per user per UTC day (`AI_DAILY_LIMIT`).
+is used. Key precedence: key typed in the request → the user's saved key for that exact effective base
+URL (`ai/keys.py`, table `ai_keys`) → the server key. Saved keys are AES-GCM encrypted with a key derived
+from `SECRET_KEY` (SQLite installs without it get a `secret.key` file next to the DB; Postgres needs
+`SECRET_KEY`, else `keyStorage` is false and the UI keeps keys in the tab). The user id, provider and base
+URL are the AEAD associated data, so a row can't be re-pointed at another URL or user. The frontend
+mirrors the base-URL normalisation in `store.effectiveBaseUrl` to show which saved key applies; on a
+browser with no AI settings yet it pre-selects the newest saved key, but only for a default or preset
+endpoint (never auto-point a user at a custom URL).
+Shared-key generations are counted in `ai_usage` per user per UTC day (`AI_DAILY_LIMIT`).
 Prompts follow a recruiter brief: use only facts in the CV, no buzzwords, no invented metrics; missing
 numbers become `[X%]`-style placeholders that the ATS check flags.
 
 **Database.** `DATABASE_URL`, else `POSTGRES_URI` (Northflank addon), else SQLite at
-`DATA_DIR/cvs.db`. Tables: `users, sessions, cvs, ai_usage`. Schema is created idempotently on startup
+`DATA_DIR/cvs.db`. Tables: `users, sessions, cvs, ai_usage, ai_keys`. Schema is created idempotently on startup
 in `db.SCHEMA`; there is no migration framework.
 
 ## Invariants — do not break these
@@ -135,8 +144,10 @@ in `db.SCHEMA`; there is no migration framework.
 4. **Every CV query is scoped by `user_id`** (`... WHERE id = ? AND user_id = ?`). Users must never see,
    change, duplicate or delete another user's data; `test_users_cannot_see_each_others_cvs` guards this.
 5. **The server's AI key is only ever sent to the server's configured base URL**, never to a URL a user
-   typed. Keep the SSRF guard (`_assert_public_host`, no redirects) active whenever auth is on. Never
-   return keys from any endpoint.
+   typed. A user's saved key is only sent to the base URL it was saved for, and only for that user.
+   Keep the SSRF guard (`_assert_public_host`, no redirects) active whenever auth is on. Never
+   return keys from any endpoint (saved keys come back as a last-4 hint only), and keep them
+   encrypted at rest.
 6. **SQL must run on both SQLite and Postgres.** Use `?` placeholders (rewritten to `%s` for Postgres),
    portable types (TEXT/INTEGER), ISO-8601 TEXT timestamps, no `rowid`, no `AUTOINCREMENT`,
    no SQLite-only pragmas outside `db.py`. `INSERT ... ON CONFLICT ... DO UPDATE ... RETURNING` is fine.
@@ -202,7 +213,7 @@ test in `tests/test_ai.py`.
   Carlito/Caladea/Liberation/DejaVu fonts). Listens on `$PORT` (default 8000), trusts proxy headers so
   HTTPS and client IPs are detected. Runs as a non-root user.
 - Postgres addon linked to the service via a secret group (`POSTGRES_URI`).
-- Production env (set in Northflank, never in git): `ADMIN_EMAILS`, `OPENAI_BASE_URL`,
+- Production env (set in Northflank, never in git): `ADMIN_EMAILS`, `SECRET_KEY` (saved AI keys), `OPENAI_BASE_URL`,
   `OPENAI_API_KEY`, `OPENAI_MODEL` (or Anthropic/Gemini equivalents + `AI_DEFAULT_PROVIDER`),
   `AI_DAILY_LIMIT`, `SIGNUP_ENABLED`.
 - Push to `main` = deploy. Schema changes therefore must be backward compatible and idempotent; the

@@ -342,6 +342,12 @@ select.input { padding-right: 4px; }
 .status.ok { background: var(--ok-soft); color: var(--ok); }
 .status.err { background: var(--danger-soft); color: var(--danger); }
 .status.info { background: var(--primary-soft); color: var(--primary-text); }
+.saved-keys { display: flex; flex-direction: column; gap: 6px; }
+.saved-keys ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 9px; }
+.saved-keys li { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 10px; font-size: 13px; min-height: 38px; }
+.saved-keys li + li { border-top: 1px solid var(--line); }
+.saved-keys li > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.saved-keys code { font-size: 12px; color: var(--ink-2); }
 .privacy { margin: 0; display: flex; gap: 8px; font-size: 12px; color: var(--muted); line-height: 1.45; }
 .privacy svg { flex: none; color: var(--ok); margin-top: 1px; }
 
