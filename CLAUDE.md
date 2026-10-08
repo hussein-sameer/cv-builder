@@ -258,7 +258,7 @@ test in `tests/test_ai.py`.
 - **Photo is optional and off unless uploaded.** Stored in the CV JSON as a JPEG data URL (the editor
   crops it to 7:9 and shrinks it to ~50 KB in `photo.ts`; `layout.photo_jpeg` re-crops server-side so
   imported JSON prints alike). Expected in DACH, the Gulf and much of Asia; discouraged for UK/IE/US/CA
-  (the ATS check says so for the International layout). The reasoning for users is in README → "Photo".
+  (the ATS check says so for the International layout).
 - **Guided tour.** `components/Tour.tsx` highlights elements marked `data-tour="…"` (TopBar, CvSwitcher,
   App, EditorCards): keep those attributes when refactoring, and add one when a new feature deserves a step.
   "Seen" is per account: `users.tour_pending` is 1 for accounts created by sign-up or `manage create-user`
