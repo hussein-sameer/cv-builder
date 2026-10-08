@@ -1,1 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#3949ab"/><rect x="9" y="7" width="14" height="18" rx="2" fill="#fff"/><rect x="12" y="11" width="8" height="1.8" rx=".9" fill="#3949ab"/><rect x="12" y="15" width="8" height="1.4" rx=".7" fill="#9fa8da"/><rect x="12" y="18.5" width="6" height="1.4" rx=".7" fill="#9fa8da"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3949ab"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <!-- a page with a folded corner, carrying a "CV" monogram -->
+  <path d="M8 0h14l10 10v14a8 8 0 0 1-8 8H8a8 8 0 0 1-8-8V8a8 8 0 0 1 8-8Z" fill="url(#g)"/>
+  <path d="M22 0v6a4 4 0 0 0 4 4h6Z" fill="#c7d2fe"/>
+  <path d="M13.4 12.2a5.2 5.2 0 1 0 0 9.6" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M16.3 11.6l3.4 10.8 3.4-10.8" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

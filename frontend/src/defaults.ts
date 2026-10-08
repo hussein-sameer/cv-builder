@@ -89,6 +89,7 @@ export function defaultAISettings(): AISettings {
   return {
     active: 'openai',
     remember: false,
+    keysInAccount: true,
     providers: {
       openai: { baseUrl: '', apiKey: '', model: '', temperature: null }, // '' = server default endpoint
       anthropic: { baseUrl: '', apiKey: '', model: '', temperature: null },

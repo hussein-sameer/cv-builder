@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
-from typing import Literal
+from typing import Callable, Literal
 from urllib.parse import urlparse
 
 import httpx
@@ -91,16 +91,13 @@ def _assert_public_host(url: str) -> None:
             )
 
 
-def resolve(cfg: ProviderConfig, need_model: bool = True) -> tuple[ProviderConfig, bool]:
-    """Fill gaps from server-side env defaults and enforce the base-URL policy.
+def effective_base_url(cfg: ProviderConfig) -> tuple[str, bool]:
+    """The base URL a request will use (blank = server default), after the base-URL policy.
 
-    Returns the effective config and whether the *server's* API key is being used.
-    The server key is only ever sent to the server's own configured endpoint, never
-    to a base URL supplied by the user.
+    Returns (base_url, custom) where ``custom`` means it differs from the server's default.
     """
     s = config.settings
-    d = s.providers[cfg.type]
-    default_base = d.base_url.strip().rstrip("/")
+    default_base = s.providers[cfg.type].base_url.strip().rstrip("/")
     requested = cfg.baseUrl.strip().rstrip("/")
     custom = bool(requested) and requested != default_base
     if custom and not s.allow_custom_base_urls:
@@ -110,7 +107,23 @@ def resolve(cfg: ProviderConfig, need_model: bool = True) -> tuple[ProviderConfi
         raise AIError("Base URL must start with http:// or https://", 400)
     if not s.allow_private_base_urls:
         _assert_public_host(base)
-    user_key = cfg.apiKey.strip()
+    return base, custom
+
+
+def resolve(
+    cfg: ProviderConfig, need_model: bool = True, account_key: Callable[[str], str | None] | None = None
+) -> tuple[ProviderConfig, bool]:
+    """Fill gaps from server-side env defaults and enforce the base-URL policy.
+
+    Key precedence: a key typed in the request, then the user's own saved key for this
+    exact base URL (``account_key(base)``), then the server's shared key.
+    Returns the effective config and whether the *server's* API key is being used.
+    The server key is only ever sent to the server's own configured endpoint, never
+    to a base URL supplied by the user.
+    """
+    d = config.settings.providers[cfg.type]
+    base, custom = effective_base_url(cfg)
+    user_key = cfg.apiKey.strip() or (account_key(base) if account_key else None) or ""
     server_key = not user_key and not custom and bool(d.api_key)
     key = user_key or (d.api_key if server_key else "")
     model = cfg.model.strip() or d.model

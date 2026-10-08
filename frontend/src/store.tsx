@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError } from './api'
 import { emptyCV, exampleCV, normalizeCV } from './defaults'
-import { hasLocalCV, lastDoc, loadAISettings, loadCV, saveAISettings, saveCV } from './storage'
-import type { AIConfig, AISettings, CV, CvMeta, Item, Section, TemplateInfo } from './types'
+import { hasLocalAISettings, hasLocalCV, lastDoc, loadAISettings, loadCV, saveAISettings, saveCV } from './storage'
+import type { AIConfig, AISettings, CV, CvMeta, Item, ProviderInfo, ProviderSettings, ProviderType, SavedKey, Section, TemplateInfo } from './types'
 
 export type Toast = { id: number; kind: 'info' | 'success' | 'error'; text: string }
 export type SaveState = 'saved' | 'saving' | 'error'
@@ -29,9 +29,15 @@ interface Store {
   ai: AISettings
   setAI: (s: AISettings) => void
   aiConfig: AIConfig | null
+  savedKeys: SavedKey[]
+  setSavedKeys: (keys: SavedKey[]) => void
   aiReady: boolean
   aiModalOpen: boolean
   openAISettings: (open?: boolean) => void
+  importOpen: boolean
+  openImport: (open?: boolean) => void
+  /** Add an imported CV: a new library entry (server) or replaces the browser-only CV (Undo restores it). */
+  importCV: (cv: CV, name: string) => Promise<boolean>
   toasts: Toast[]
   toast: (text: string, kind?: Toast['kind']) => void
   dismissToast: (id: number) => void
@@ -67,6 +73,18 @@ export function moveInArray<T>(arr: T[], index: number, delta: number): void {
 const HISTORY_LIMIT = 50
 export const CLOUD_HOSTS = /api\.openai\.com|openrouter\.ai|api\.groq\.com|api\.deepseek\.com|api\.mistral\.ai|api\.together\.xyz/
 
+/** The endpoint a provider config will call (blank = server default), normalised like the server does. */
+export function effectiveBaseUrl(p: ProviderSettings, info?: ProviderInfo): string {
+  const strip = (u: string) => u.trim().replace(/\/+$/, '')
+  return strip(p.baseUrl) || strip(info?.defaultBaseUrl ?? '')
+}
+
+/** The account key the server will use for this provider, if one is saved for exactly this endpoint. */
+export function savedKeyFor(keys: SavedKey[], type: ProviderType, p: ProviderSettings, info?: ProviderInfo): SavedKey | undefined {
+  const base = effectiveBaseUrl(p, info)
+  return base ? keys.find((k) => k.provider === type && k.baseUrl === base) : undefined
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [cv, setCv] = useState<CV>(loadCV)
   const cvRef = useRef(cv)
@@ -81,7 +99,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [templates, setTemplates] = useState<TemplateInfo[]>([])
   const [ai, setAIState] = useState<AISettings>(loadAISettings)
   const [aiConfig, setAIConfig] = useState<AIConfig | null>(null)
+  const [savedKeys, setSavedKeys] = useState<SavedKey[]>([])
   const [aiModalOpen, setAIModalOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const lastSnapshot = useRef<number>(0)
   // the CV object last loaded from / written to the server – no need to save it again
@@ -140,7 +160,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Boot: load the library from the server; migrate a pre-library local draft on first run.
   useEffect(() => {
     api.meta().then((m) => setTemplates(m.templates)).catch(() => undefined)
-    api.aiConfig().then(setAIConfig).catch(() => undefined)
+    void Promise.allSettled([api.aiConfig(), api.aiKeys()]).then(([cfgRes, keysRes]) => {
+      const cfg = cfgRes.status === 'fulfilled' ? cfgRes.value : null
+      const keys = keysRes.status === 'fulfilled' ? keysRes.value : []
+      if (cfg) setAIConfig(cfg)
+      setSavedKeys(keys)
+      // New device or browser: start from the most recently saved account key instead of blank settings.
+      // Only for the default or a preset endpoint, so a key planted for some other URL (e.g. via a stolen
+      // session) can't silently redirect this user's CV text. Not persisted until the user saves AI settings.
+      if (!hasLocalAISettings() && cfg) {
+        const blank = { baseUrl: '', apiKey: '', model: '', temperature: null }
+        const known = (k: SavedKey) => {
+          const info = cfg.providers.find((p) => p.type === k.provider)
+          if (!info) return null
+          if (effectiveBaseUrl(blank, info) === k.baseUrl) return ''
+          return info.presets.some((x) => effectiveBaseUrl({ ...blank, baseUrl: x.baseUrl }) === k.baseUrl) ? k.baseUrl : null
+        }
+        const k = [...keys].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).find((x) => known(x) !== null)
+        if (k) {
+          const baseUrl = known(k) ?? ''
+          setAIState((s) => ({ ...s, active: k.provider, providers: { ...s.providers, [k.provider]: { ...s.providers[k.provider], baseUrl } } }))
+        }
+      }
+    })
     let cancelled = false
     ;(async () => {
       try {
@@ -290,6 +332,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     commit(h[h.length - 1])
   }, [])
 
+  const importCV = useCallback(
+    async (data: CV, name: string) => {
+      if (storageMode !== 'server') {
+        replaceCV(data)
+        return true
+      }
+      return (await createDoc({ data }, name.trim().slice(0, 120) || 'Imported CV')) !== null
+    },
+    [storageMode, createDoc, replaceCV],
+  )
+
   const setAI = useCallback((s: AISettings) => {
     setAIState(s)
     saveAISettings(s)
@@ -309,7 +362,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const info = aiConfig?.providers.find((p) => p.type === ai.active)
   const hasModel = !!(active.model || info?.defaultModel)
   const selfHosted = ai.active === 'ollama' || (ai.active === 'openai' && !!active.baseUrl && !CLOUD_HOSTS.test(active.baseUrl))
-  const aiReady = hasModel && (selfHosted || !!active.apiKey || !!info?.serverKey)
+  const aiReady = hasModel && (selfHosted || !!active.apiKey || !!savedKeyFor(savedKeys, ai.active, active, info) || !!info?.serverKey)
 
   const value = useMemo<Store>(
     () => ({
@@ -333,14 +386,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ai,
       setAI,
       aiConfig,
+      savedKeys,
+      setSavedKeys,
       aiReady,
       aiModalOpen,
       openAISettings: (open = true) => setAIModalOpen(open),
+      importOpen,
+      openImport: (open = true) => setImportOpen(open),
+      importCV,
       toasts,
       toast,
       dismissToast,
     }),
-    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, aiReady, aiModalOpen, toasts, toast, dismissToast],
+    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, savedKeys, aiReady, aiModalOpen, importOpen, importCV, toasts, toast, dismissToast],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

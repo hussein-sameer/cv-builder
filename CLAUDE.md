@@ -58,6 +58,7 @@ backend/app/
   storage.py       CV library CRUD, always scoped by user_id;  cvs_router.py = /api/cvs routes
   manage.py        Admin CLI (no email password reset exists)
   ai/providers.py  Raw-REST adapters: openai-compatible, anthropic, gemini, ollama; resolve() = key/base-URL policy + SSRF guard
+  ai/keys.py       Per-user saved API keys: AES-256-GCM (SECRET_KEY or SQLite-side secret.key), bound to user+provider+base URL
   ai/prompts.py    Prompt builders (summary, bullets), CV -> plain text, output cleaners
   ai/router.py     /api/ai/* routes, shared-key daily limit
 backend/tests/     pytest; conftest.py has the fixtures (see Testing)
@@ -72,12 +73,21 @@ frontend/src/
   defaults.ts          uid(), emptyItem/newSection/emptyCV/exampleCV, normalizeCV (back-compat for old saves)
   storage.ts           localStorage/sessionStorage, namespaced per user id
   atsCheck.ts          Client-side ATS lint rules shown in the "ATS check" panel
+  cvImport.ts          "Upload CV with AI": the instruction users paste into an external AI chat, and parseCvText(),
+                       the lenient JSON -> CV importer (code fences, date formats, section aliases) used by every JSON import
   useAI.ts             Hook wrapping AI calls (readiness, busy flag, error toasts, low-quota notice)
   theme.ts             light/dark/system theme hook; index.html applies it before first paint
-  styles.css           ALL styling; design tokens at the top, dark theme overrides in :root[data-theme='dark']
+  styles.css           ALL styling; design tokens at the top, dark theme overrides in :root[data-theme='dark'].
+                       Responsive top bar: labels drop at 1200px (.hide-lg) and 1024px, the layout switch gets
+                       its own row at 880px, three rows + full-width menus at 720px. New top-bar buttons need
+                       an aria-label and must still fit at 360px
+  ../public/           favicon.svg (tab icon, also the header/login mark), logo.svg (mark + wordmark),
+                       favicon.ico + apple-touch-icon.png rendered from favicon.svg: regenerate both if it changes
+                       and bump the ?v= in index.html so browsers drop the cached icon
   components/          TopBar, CvSwitcher, AccountMenu, EditorCards (personal/target/add-section), SectionCard,
                        ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange),
-                       AiSettingsModal, PdfPreview, AtsPanel, ui (Modal, Popover, ConfirmDelete, Spinner)
+                       AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), PdfPreview, AtsPanel,
+                       ui (Modal, Popover, ConfirmDelete, Spinner)
 ```
 
 ## How it works
@@ -114,12 +124,20 @@ daily limit). Throttles are in-memory (fine: production runs a single instance).
 
 **AI.** `resolve()` merges the request's provider settings with server env defaults. A blank
 `baseUrl` on the client means "server default endpoint", which is the only case where the server's key
-is used. Shared-key generations are counted in `ai_usage` per user per UTC day (`AI_DAILY_LIMIT`).
+is used. Key precedence: key typed in the request → the user's saved key for that exact effective base
+URL (`ai/keys.py`, table `ai_keys`) → the server key. Saved keys are AES-GCM encrypted with a key derived
+from `SECRET_KEY` (SQLite installs without it get a `secret.key` file next to the DB; Postgres needs
+`SECRET_KEY`, else `keyStorage` is false and the UI keeps keys in the tab). The user id, provider and base
+URL are the AEAD associated data, so a row can't be re-pointed at another URL or user. The frontend
+mirrors the base-URL normalisation in `store.effectiveBaseUrl` to show which saved key applies; on a
+browser with no AI settings yet it pre-selects the newest saved key, but only for a default or preset
+endpoint (never auto-point a user at a custom URL).
+Shared-key generations are counted in `ai_usage` per user per UTC day (`AI_DAILY_LIMIT`).
 Prompts follow a recruiter brief: use only facts in the CV, no buzzwords, no invented metrics; missing
 numbers become `[X%]`-style placeholders that the ATS check flags.
 
 **Database.** `DATABASE_URL`, else `POSTGRES_URI` (Northflank addon), else SQLite at
-`DATA_DIR/cvs.db`. Tables: `users, sessions, cvs, ai_usage`. Schema is created idempotently on startup
+`DATA_DIR/cvs.db`. Tables: `users, sessions, cvs, ai_usage, ai_keys`. Schema is created idempotently on startup
 in `db.SCHEMA`; there is no migration framework.
 
 ## Invariants — do not break these
@@ -135,14 +153,18 @@ in `db.SCHEMA`; there is no migration framework.
 4. **Every CV query is scoped by `user_id`** (`... WHERE id = ? AND user_id = ?`). Users must never see,
    change, duplicate or delete another user's data; `test_users_cannot_see_each_others_cvs` guards this.
 5. **The server's AI key is only ever sent to the server's configured base URL**, never to a URL a user
-   typed. Keep the SSRF guard (`_assert_public_host`, no redirects) active whenever auth is on. Never
-   return keys from any endpoint.
+   typed. A user's saved key is only sent to the base URL it was saved for, and only for that user.
+   Keep the SSRF guard (`_assert_public_host`, no redirects) active whenever auth is on. Never
+   return keys from any endpoint (saved keys come back as a last-4 hint only), and keep them
+   encrypted at rest.
 6. **SQL must run on both SQLite and Postgres.** Use `?` placeholders (rewritten to `%s` for Postgres),
    portable types (TEXT/INTEGER), ISO-8601 TEXT timestamps, no `rowid`, no `AUTOINCREMENT`,
    no SQLite-only pragmas outside `db.py`. `INSERT ... ON CONFLICT ... DO UPDATE ... RETURNING` is fine.
    Schema changes must be idempotent (`CREATE ... IF NOT EXISTS`; add columns with a guarded `ALTER`).
 7. **AI prompts must not invent facts.** Keep the "use only facts in the CV" and placeholder rules when
-   editing `prompts.py`.
+   editing `prompts.py`, and the "copy my wording exactly, add nothing" rules in `cvImport.AI_IMPORT_PROMPT`.
+   If you change the CV schema, update that prompt's format block and `parseCvText` too, and keep a
+   CV Builder JSON export importing unchanged.
 8. **pdf.js must use the legacy build** (`pdfjs-dist/legacy/build/pdf.mjs` + its worker). The modern
    v6 build calls `Map.prototype.getOrInsertComputed`, which many browsers lack, so the preview breaks.
 9. **No blocking browser dialogs** (`alert/confirm/prompt`). Use `ConfirmDelete` (two-step button) or
@@ -194,7 +216,7 @@ test in `tests/test_ai.py`.
   `httpx.MockTransport` recorder; `server_key` gives the server an OpenAI key; SSRF tests monkeypatch
   `providers._host_ips`.
 - Frontend has no unit tests; `npm run build` (tsc) is the gate. For UI changes, describe what you
-  verified, and when possible check it in a browser (desktop and ~390 px wide, light and dark theme).
+  verified, and when possible check it in a browser (desktop, ~900 px and ~390 px wide, light and dark theme).
 
 ## Deployment (Northflank)
 
@@ -202,7 +224,7 @@ test in `tests/test_ai.py`.
   Carlito/Caladea/Liberation/DejaVu fonts). Listens on `$PORT` (default 8000), trusts proxy headers so
   HTTPS and client IPs are detected. Runs as a non-root user.
 - Postgres addon linked to the service via a secret group (`POSTGRES_URI`).
-- Production env (set in Northflank, never in git): `ADMIN_EMAILS`, `OPENAI_BASE_URL`,
+- Production env (set in Northflank, never in git): `ADMIN_EMAILS`, `SECRET_KEY` (saved AI keys), `OPENAI_BASE_URL`,
   `OPENAI_API_KEY`, `OPENAI_MODEL` (or Anthropic/Gemini equivalents + `AI_DEFAULT_PROVIDER`),
   `AI_DAILY_LIMIT`, `SIGNUP_ENABLED`.
 - Push to `main` = deploy. Schema changes therefore must be backward compatible and idempotent; the
@@ -225,6 +247,11 @@ test in `tests/test_ai.py`.
   strict mode, function components, no `any`; user-facing text in plain, friendly English.
 
 ## Known limitations / ideas
+
+- **No photo field, by design.** Neither layout requires one: international CVs (UK/US/IE/CA/AU) should
+  leave it out for anti-discrimination reasons, and the Europass photo is optional ("only if the employer
+  asks"). Images also break invariant 1 and give ATS parsers nothing to read. Don't add a photo field
+  unless the owner asks; the reasoning for users is in README → "Why there's no photo".
 
 - No email-based password reset (admin CLI only); no email verification on sign-up.
 - Login/sign-up throttles are in-memory, so they reset on restart and assume one instance.

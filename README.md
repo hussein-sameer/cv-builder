@@ -1,3 +1,5 @@
+<img src="frontend/public/logo.svg" alt="CV Builder" height="40">
+
 # CV Builder
 
 A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF**, with an AI helper that drafts your profile summary and rewrites bullet points using the provider you choose: OpenAI-compatible APIs, Anthropic, Google Gemini or a local Ollama model. It supports multiple users, each with their own private CV library, and can be hosted for free (see [Free hosting on Northflank](#free-hosting-on-northflank)).
@@ -5,6 +7,7 @@ A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF*
 - **Form editor.** Personal details, then sections you add when you need them: experience, education, skills, languages, certifications, projects, courses, volunteering, awards, publications, interests, references, plus custom entry or free-text sections. You can rename, reorder, hide or delete any section.
 - **Live preview of the real PDF.** The server renders the PDF and the browser draws it with pdf.js, so the preview is the file you download. It also shows the page count.
 - **Two layouts.** *International ATS* (no personal data, `Mar 2021 – Present`) and *EU / UK* (nationality, work permit and driving licence block, `03/2021` dates first, CEFR language levels). Both are single-column and ATS-safe.
+- **Upload CV with AI.** Bring in an existing PDF or Word CV without retyping it. A three-step guide has you attach the file in any AI chat (ChatGPT, Claude, Gemini, Copilot…), paste an instruction the app gives you, then upload the `cv.json` the chat returns (or paste its reply). The instruction tells the AI to copy your wording exactly and invent nothing. The import is forgiving about date formats and section names, and lands as a new CV in your library. CV Builder never sees the original file.
 - **CV library.** Save as many CVs as you like (for example *Software Engineer* and *DevOps*). Use **Duplicate to tailor** to copy one, then set its **Target job** so the AI tailors the wording. Edits save automatically.
 - **AI writing.** "Generate with AI" for the summary. "Improve / Draft with AI" for each experience or project entry, with a review step before anything is applied. The prompts forbid inventing facts. Where a number would help, the AI leaves a `[X%]` placeholder, and the ATS check flags any left in.
 - **ATS check.** Flags missing contact details, missing dates, weak bullet openers ("Responsible for…"), unfilled placeholders, emoji and page count.
@@ -22,6 +25,17 @@ A web app for writing **ATS-friendly CVs** and exporting them as **DOCX and PDF*
 | Real text layer with embedded TrueType fonts (copy and paste works) | n/a | ✅ |
 | Standard headings ("Experience", "Education", "Skills"…) | ✅ | ✅ |
 | Unicode names (é, ł, ü…) | ✅ | ✅ |
+| No photo or other images | ✅ | ✅ |
+
+### Why there's no photo
+
+A photo isn't required by either layout, so CV Builder leaves it out on purpose:
+
+- **International (UK, Ireland, US, Canada, Australia):** leave it out. Employers avoid photos because they show age, race, sex and disability, which equality law (UK Equality Act 2010, US Title VII/ADEA/ADA) says must not affect hiring. Many recruiters in these countries are used to photo-free CVs, and some discard CVs that include one.
+- **EU / Europass:** the photo is an optional field. The EU's own Europass instructions say to add one only if the employer asks for it, and to leave out any field you don't need. Photos are still common in parts of Europe (for example Germany and Austria), but they're a custom, not a rule. In Germany an employer can't require one, because the General Equal Treatment Act (AGG) bars selecting people by the traits a photo shows.
+- **ATS:** parsers can't read anything in an image. A headshot near the top can also push your name out of the place where parsers look for it. Keeping images out of the file is part of what keeps this app's DOCX and PDF ATS-safe.
+
+If a job ad explicitly asks for a photo (common for some traditional employers in Germany, Austria and Switzerland), attach a separate professional headshot to the application, or add it to an exported DOCX by hand for that one application.
 
 ## Quick start with Docker (your own machine)
 
@@ -50,6 +64,7 @@ Northflank's free **Developer Sandbox** includes 2 always-on services and 1 data
    | Variable | Example | Why |
    |---|---|---|
    | `ADMIN_EMAILS` | `you@example.com` | Your account isn't limited by the daily AI cap |
+   | `SECRET_KEY` | 32+ random characters (`python -c "import secrets; print(secrets.token_urlsafe(32))"`) | Encrypts the API keys people save to their accounts. Required on Postgres; keep it stable, because changing it means everyone has to paste their key again |
    | `OPENAI_BASE_URL` | `https://openrouter.ai/api/v1` | Shared AI provider (any OpenAI-compatible API) |
    | `OPENAI_API_KEY` | `sk-or-...` | Shared key that every user's "Generate with AI" uses |
    | `OPENAI_MODEL` | a model ID from your provider | Default model, so users don't have to pick one |
@@ -88,7 +103,7 @@ npm run dev
 
 Production without Docker: run `npm run build`, then start the API with `STATIC_DIR=../frontend/dist`. That serves the UI and the API on one port, and you can put Nginx in front.
 
-Run the tests with `cd backend && pytest`. They cover the renderers, ATS-safety checks, all four AI adapters (against a mock transport, with no keys needed), accounts and sessions, per-user isolation, the shared-key limits and the SSRF guard. Set `TEST_DATABASE_URL=postgresql://...` to run every database test against Postgres as well as SQLite.
+Run the tests with `cd backend && pytest`. They cover the renderers, ATS-safety checks, all four AI adapters (against a mock transport, with no keys needed), accounts and sessions, per-user isolation, the shared-key limits, encrypted per-user saved keys and the SSRF guard. Set `TEST_DATABASE_URL=postgresql://...` to run every database test against Postgres as well as SQLite.
 
 ## Connecting an AI provider
 
@@ -105,7 +120,14 @@ Click **Connect AI** in the top bar:
 
 **Shared server key:** put a key in the server environment (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) and every signed-in user can generate without pasting one, up to `AI_DAILY_LIMIT` generations per day each (admins are exempt). The key itself never reaches the browser, and it's only ever sent to the server's own configured endpoint, never to a base URL a user types in.
 
-**Personal keys:** users can paste their own key in AI settings; those requests aren't limited. Keys go from the browser to the CV Builder server, which forwards them to the provider and never stores or logs them. Unless **Remember API keys on this device** is ticked, the browser keeps them only for the current tab.
+**Personal keys (per account):** each person can paste their own key in AI settings; requests on your own key aren't limited. With **Save API keys to my account** ticked (the default), the key is stored on the server, encrypted, and tied to that person's account, so it works on any device they log in from and nobody else can use it. Key precedence for each request is: a key typed in this tab → your saved key → the server's shared key.
+
+- Saved keys are encrypted with AES-256-GCM using `SECRET_KEY`. On SQLite installs with no `SECRET_KEY`, a random key is created once in `secret.key` next to the database. **Postgres deployments must set `SECRET_KEY`**; without it, saving keys is switched off and keys stay in the browser tab as before.
+- Each saved key is bound to the endpoint (provider + base URL) it was saved for and is only ever sent there. To use a different base URL, save the key again for that URL.
+- The API never returns a saved key, only its last 4 characters. Remove saved keys in AI settings; deleting the account deletes them too.
+- Untick **Save API keys to my account** to keep a key in the current browser tab only; the server then just forwards it to the provider without storing it.
+
+To make everyone bring their own key, don't set a server key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`).
 
 ## Security notes
 
@@ -113,6 +135,7 @@ Click **Connect AI** in the top bar:
 - **Brute-force protection:** 8 failed logins per email or 40 per IP in 15 minutes → temporary block; 5 sign-ups per IP per hour. Unknown emails and wrong passwords get the same answer.
 - **Isolation:** every CV query is filtered by the owner's id; tests check one user can't read, change, duplicate or delete another's CVs.
 - **CSRF / abuse:** state-changing API calls from another site's origin are rejected; request bodies over 2 MB are refused; the PDF/DOCX/AI endpoints require login.
+- **Saved AI keys** are encrypted at rest (AES-256-GCM, `SECRET_KEY`), bound to their owner and endpoint, and never sent back to the browser. Someone who steals a session can use the victim's key through the app, but can't read it or point it at another host.
 - **SSRF:** with accounts on, AI base URLs that resolve to localhost or private/internal IPs are blocked (`ALLOW_PRIVATE_BASE_URLS=false`), and redirects aren't followed. This is why Ollama only works on self-hosted installs.
 - **Open sign-up + shared AI key** means anyone who finds the URL can spend up to `AI_DAILY_LIMIT` generations a day of your credit. Keep the limit modest, set a spending cap at your AI provider, and switch `SIGNUP_ENABLED=false` once your friends have accounts.
 - **Backups:** export important CVs as JSON (⋯ menu), and/or back up the Postgres database (`pg_dump`) or the `cv-data` volume.
@@ -128,7 +151,9 @@ Click **Connect AI** in the top bar:
 | `GET` | `/api/auth/me`, `/api/auth/config` | Current user; whether sign-up is open |
 | `GET/POST` | `/api/cvs` | List / create (`{name, data}` or `{name, sourceId}` to duplicate) |
 | `GET/PUT/DELETE` | `/api/cvs/{id}` | Load / save (`{name?, data?}`) / delete |
-| `GET` | `/api/ai/config` | Providers and whether a server key exists (never the key) |
+| `GET` | `/api/ai/config` | Providers, whether a server key exists (never the key), whether keys can be saved to accounts |
+| `GET/PUT` | `/api/ai/keys` | List your saved keys (provider, base URL, last 4 characters) / save one (`{provider: {type, baseUrl, apiKey}}`) |
+| `DELETE` | `/api/ai/keys/{id}` | Remove a saved key |
 | `POST` | `/api/ai/models` | List models (connection test) |
 | `POST` | `/api/ai/generate` | `task: "summary" \| "bullets"` → `{text}` / `{bullets}` |
 
@@ -143,7 +168,7 @@ backend/app/
   render_docx.py   python-docx writer
   render_pdf.py    ReportLab writer (embedded TTF fonts)
   fonts.py         finds Calibri/Arial… or metric-compatible Carlito/Liberation/Caladea
-  ai/              provider adapters (raw REST, no SDKs), prompts, routes
+  ai/              provider adapters (raw REST, no SDKs), prompts, routes, encrypted per-user keys
   db.py            SQLite or Postgres (DATABASE_URL / POSTGRES_URI), schema + migrations
   auth.py          accounts, scrypt passwords, cookie sessions, throttling
   storage.py       per-user CV library;  cvs_router.py  its routes

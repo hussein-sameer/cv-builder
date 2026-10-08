@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
@@ -15,8 +15,8 @@ from .. import config
 from ..auth import User, current_user
 from ..db import get_db
 from ..models import CV
-from . import prompts
-from .providers import PROVIDER_INFO, AIError, ProviderConfig, chat, list_models, resolve
+from . import keys, prompts
+from .providers import PROVIDER_INFO, AIError, ProviderConfig, chat, effective_base_url, list_models, resolve
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -30,6 +30,10 @@ class ModelsRequest(BaseModel):
     provider: ProviderConfig
 
 
+class KeyRequest(BaseModel):
+    provider: ProviderConfig
+
+
 class GenerateRequest(BaseModel):
     provider: ProviderConfig
     task: Literal["summary", "bullets"]
@@ -39,6 +43,11 @@ class GenerateRequest(BaseModel):
 
 def _err(e: AIError) -> JSONResponse:
     return JSONResponse({"detail": e.message}, status_code=e.status_code)
+
+
+def _account_key(user: User, provider: str):
+    """Lookup for resolve(): the user's saved key for the base URL the request will use."""
+    return lambda base: keys.get_key(user.id, provider, base)
 
 
 def _count_server_key_use(user: User) -> int | None:
@@ -72,6 +81,7 @@ def ai_config(_: User = Depends(current_user)):
         "allowCustomBaseUrls": s.allow_custom_base_urls,
         "allowPrivateBaseUrls": s.allow_private_base_urls,
         "dailyLimit": s.ai_daily_limit,
+        "keyStorage": keys.available(),
         "providers": [
             {
                 "type": t,
@@ -85,10 +95,35 @@ def ai_config(_: User = Depends(current_user)):
     }
 
 
-@router.post("/models")
-async def ai_models(req: ModelsRequest, _: User = Depends(current_user)):
+@router.get("/keys")
+def list_keys(user: User = Depends(current_user)):
+    """The user's saved keys: provider, base URL and a hint, never the key itself."""
+    return keys.list_keys(user.id)
+
+
+@router.put("/keys")
+def save_key(req: KeyRequest, user: User = Depends(current_user)):
+    """Save (or replace) the user's key for this provider and base URL, encrypted."""
+    api_key = req.provider.apiKey.strip()
     try:
-        cfg, _server = await run_in_threadpool(resolve, req.provider, False)
+        if not api_key:
+            raise AIError("Paste an API key to save.", 400)
+        base, _custom = effective_base_url(req.provider)
+        return keys.save_key(user.id, req.provider.type, base, api_key)
+    except AIError as e:
+        return _err(e)
+
+
+@router.delete("/keys/{key_id}", status_code=204)
+def delete_key(key_id: str, user: User = Depends(current_user)):
+    if not keys.delete_key(user.id, key_id):
+        raise HTTPException(404, "Saved key not found.")
+
+
+@router.post("/models")
+async def ai_models(req: ModelsRequest, user: User = Depends(current_user)):
+    try:
+        cfg, _server = await run_in_threadpool(resolve, req.provider, False, _account_key(user, req.provider.type))
         async with make_client() as client:
             models = await list_models(cfg, client)
     except AIError as e:
@@ -100,7 +135,7 @@ async def ai_models(req: ModelsRequest, _: User = Depends(current_user)):
 async def ai_generate(req: GenerateRequest, user: User = Depends(current_user)):
     remaining = None
     try:
-        cfg, server_key = await run_in_threadpool(resolve, req.provider)
+        cfg, server_key = await run_in_threadpool(resolve, req.provider, True, _account_key(user, req.provider.type))
         if req.task == "summary":
             system, user_prompt = prompts.summary_prompts(req.cv, req.options)
         else:

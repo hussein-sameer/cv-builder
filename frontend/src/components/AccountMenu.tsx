@@ -26,7 +26,7 @@ export function AccountMenu() {
   }
 
   return (
-    <div className="popover-anchor">
+    <div className="popover-anchor account-anchor">
       <button type="button" className="avatar-btn" data-popover-trigger aria-label="Account" title={user.email} onClick={() => setOpen(!open)}>
         {initials || <UserRound size={16} />}
       </button>

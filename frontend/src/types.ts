@@ -89,7 +89,10 @@ export interface ProviderSettings {
 
 export interface AISettings {
   active: ProviderType
+  /** keep typed keys in localStorage (only offered when the server can't save keys to accounts) */
   remember: boolean
+  /** save typed keys to the account on the server (encrypted) instead of this browser */
+  keysInAccount: boolean
   providers: Record<ProviderType, ProviderSettings>
 }
 
@@ -109,7 +112,18 @@ export interface AIConfig {
   allowCustomBaseUrls: boolean
   allowPrivateBaseUrls: boolean
   dailyLimit: number
+  /** the server can save keys to accounts (SECRET_KEY set, or SQLite) */
+  keyStorage: boolean
   providers: ProviderInfo[]
+}
+
+/** A key saved to the user's account. The key itself never comes back, only a hint. */
+export interface SavedKey {
+  id: string
+  provider: ProviderType
+  baseUrl: string
+  hint: string
+  updatedAt: string
 }
 
 export interface TemplateInfo {
