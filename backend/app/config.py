@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+import re
 
 
 def _load_dotenv() -> None:
@@ -18,7 +19,8 @@ def _load_dotenv() -> None:
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key, _, value = line.partition("=")
-            value = value.strip().strip('"').strip("'")
+            value = value.strip()
+            value = value[1:-1] if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'" else re.split(r"\s+#", value, maxsplit=1)[0].strip()
             os.environ.setdefault(key.strip(), value)
         break
 
