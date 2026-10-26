@@ -59,8 +59,9 @@ backend/app/
   manage.py        Admin CLI (no email password reset exists)
   ai/providers.py  Raw-REST adapters: openai-compatible, anthropic, gemini, ollama; resolve() = key/base-URL policy + SSRF guard
   ai/keys.py       Per-user saved API keys: AES-256-GCM (SECRET_KEY or SQLite-side secret.key), bound to user+provider+base URL
-  ai/prompts.py    Prompt builders (summary, bullets), CV -> plain text, output cleaners
-  ai/router.py     /api/ai/* routes, shared-key daily limit
+  ai/prompts.py    Prompt builders (summary, bullets, job match report, skills), CV -> plain text, output cleaners
+                   and JSON-reply parsers (parse_report, parse_skills)
+  ai/router.py     /api/ai/* routes (PROMPTS table: one entry per generate task), shared-key daily limit
 backend/tests/     pytest; conftest.py has the fixtures (see Testing)
 
 frontend/src/
@@ -89,6 +90,7 @@ frontend/src/
   components/          TopBar, CvSwitcher, AccountMenu, EditorCards (personal/target/add-section), SectionCard,
                        ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange), PhoneInput,
                        AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), Tour (guided tour), PdfPreview, AtsPanel,
+                       JobReport (the Target job card's recruiter check),
                        ui (Modal, Popover, ConfirmDelete, Spinner)
 ```
 
@@ -99,7 +101,8 @@ frontend/src/
 Items are *generic*: one `Item` shape (`title, organization, location, startDate, endDate, current,
 date, description, bullets[], tags[], grade, link, level`) whose meaning depends on the section type.
 This is what makes "add any section on demand" cheap. Dates are `"YYYY"` or `"YYYY-MM"`.
-`target` (role + job description) feeds the AI and is never printed.
+`target` (role + job description, plus the last AI job match `report`) feeds the AI and is never printed.
+The report is saved with the CV; `parseCvText` drops it on import (it's re-run, not trusted from a file).
 
 **Rendering pipeline.** `layout.build_document(cv)` turns the CV into a `RenderDoc` IR made of blocks
 (`paragraphs | entries | pairs | lines`). `render_docx` and `render_pdf` only know how to draw the IR,
@@ -137,6 +140,14 @@ endpoint (never auto-point a user at a custom URL).
 Shared-key generations are counted in `ai_usage` per user per UTC day (`AI_DAILY_LIMIT`).
 Prompts follow a recruiter brief: use only facts in the CV, no buzzwords, no invented metrics; missing
 numbers become `[X%]`-style placeholders that the ATS check flags.
+Generate tasks: `summary`, `bullets`, `tailor` (job match report as JSON: keywords with the posting's exact
+wording marked must/nice, requirements with evidence, strengths, gaps, questions, next steps, estimate) and
+`skills` (regrouped skills; `parse_skills` drops any skill not found in the CV's own text and returns it as
+`dropped`, so "only skills you have" is enforced in code, not just asked for). JSON replies go through
+`parse_json_object`, which tolerates fences, `<think>` and trailing commas; an unusable reply is a 502 asking to
+retry. The keyword match % is never stored: `atsCheck.keywordMatch` recounts the report's keywords against the
+CV on every render (must-haves count double), and `atsCheck.jobKey` marks a report stale when the role or job
+description changes. `atsCheck.countTerm` mirrors `prompts.mentions` (whole word, a trailing `+`/`#` is part of it).
 
 **Database.** `DATABASE_URL`, else `POSTGRES_URI` (Northflank addon), else SQLite at
 `DATA_DIR/cvs.db`. Tables: `users, sessions, cvs, ai_usage, ai_keys`. Schema is created idempotently on startup

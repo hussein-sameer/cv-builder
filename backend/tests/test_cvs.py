@@ -40,6 +40,20 @@ def test_validation_and_missing(client, sample):
     assert client.post("/api/cvs", json={"name": "  "}).json()["name"] == "Untitled CV"
 
 
+def test_job_report_is_saved_with_the_cv(client, sample):
+    assert client.post("/api/cvs", json={"name": "x", "data": sample}).json()["data"]["target"]["report"] is None
+    sample["target"]["report"] = {
+        "estimate": 64, "keywords": [{"term": "Python", "kind": "must"}, {"term": "Ansible", "kind": "nice"}],
+        "requirements": [{"text": "Ansible", "kind": "must", "evidence": ""}], "questions": ["Have you used Ansible?"],
+        "model": "m", "createdAt": "2026-10-26T09:00:00Z", "jobKey": "1a2b3c4d",
+    }
+    cv = client.post("/api/cvs", json={"name": "Automation", "data": sample}).json()
+    report = client.get(f"/api/cvs/{cv['id']}").json()["data"]["target"]["report"]
+    assert report["keywords"][1] == {"term": "Ansible", "kind": "nice"} and report["jobKey"] == "1a2b3c4d"
+    sample["target"]["report"]["estimate"] = 150
+    assert client.put(f"/api/cvs/{cv['id']}", json={"data": sample}).status_code == 422
+
+
 def test_users_cannot_see_each_others_cvs(client, sample):
     mine = client.post("/api/cvs", json={"name": "Mine", "data": sample}).json()
     other = signup(TestClient(app), email="sam@example.com")

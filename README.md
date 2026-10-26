@@ -48,6 +48,8 @@ The server renders the real PDF on every change (debounced), and the browser dra
 - **Generate with AI** drafts the profile summary; **Improve / Draft with AI** rewrites the bullet points of an entry. Suggestions are reviewed before they are applied.
 - Prompts restrict the model to facts already in the CV. Where a figure would strengthen a bullet, the model inserts an `[X%]`-style placeholder, which the ATS check reports.
 - A **target job** (role and job description) can be attached to each CV; it tailors the AI's wording and is never printed.
+- **Check my fit with AI** reads the CV against the job description like a recruiter: the posting's keywords in its exact wording, split into must-haves and nice-to-haves, each requirement with the CV's evidence (or "not shown"), strongest selling points, biggest gaps, questions to confirm before adding anything, next steps and an overall estimate. The keyword match % is recounted live as the CV changes (aim for 70–80%; the ATS check warns below 50%). The report is saved with the CV.
+- **Tailor skills with AI** regroups and reorders the Skills section for the job, using only skills the CV already shows; anything else the model suggests is listed as "not added" instead.
 - Supported providers: any OpenAI-compatible API (OpenAI, OpenRouter, Groq, DeepSeek, Mistral, LM Studio, vLLM…), Anthropic, Google Gemini and Ollama.
 
 ### Upload CV with AI
@@ -249,7 +251,7 @@ Interactive OpenAPI documentation is served at `/docs`.
 | `GET` / `PUT` | `/api/ai/keys` | List saved keys (provider, base URL, last four characters) / save one |
 | `DELETE` | `/api/ai/keys/{id}` | Remove a saved key |
 | `POST` | `/api/ai/models` | List a provider's models (connection test) |
-| `POST` | `/api/ai/generate` | `task: "summary" \| "bullets"` → `{text}` / `{bullets}` |
+| `POST` | `/api/ai/generate` | `task: "summary" \| "bullets" \| "tailor" \| "skills"` → `{text}` / `{bullets}` / `{report}` / `{groups, dropped}` |
 
 ## Testing
 

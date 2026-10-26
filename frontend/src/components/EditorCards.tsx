@@ -1,12 +1,14 @@
-import { ChevronDown, ChevronRight, Crosshair, Globe, ImageUp, Plus, Trash2, UserRound } from 'lucide-react'
+import { ChevronDown, ChevronRight, Crosshair, Gauge, Globe, ImageUp, Plus, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { PROFILE_EXAMPLE, siteOnly } from '../atsCheck'
+import { jobKey, keywordMatch, PROFILE_EXAMPLE, siteOnly } from '../atsCheck'
 import { newSection } from '../defaults'
 import { photoFromFile } from '../photo'
 import { ADDABLE_ORDER, SECTION_TYPES } from '../sectionTypes'
 import { useStore } from '../store'
 import type { Personal, SectionType } from '../types'
+import { useAI } from '../useAI'
 import { AutoTextArea, Field, TextInput } from './fields'
+import { JobReportView } from './JobReport'
 import { PhoneInput } from './PhoneInput'
 import { Spinner } from './ui'
 
@@ -152,8 +154,16 @@ function PhotoField() {
 
 export function TargetCard() {
   const { cv, mutate } = useStore()
+  const ai = useAI()
   const [open, setOpen] = useState(!!(cv.target.role || cv.target.jobDescription))
   const ref = useRef<HTMLElement>(null)
+  const match = keywordMatch(cv)
+  const report = cv.target.report
+
+  const check = async () => {
+    const res = await ai.tailor()
+    if (res) mutate((d) => void (d.target.report = { ...res.report, model: res.model, createdAt: new Date().toISOString(), jobKey: jobKey(d.target) }))
+  }
 
   useEffect(() => {
     const handler = () => {
@@ -168,7 +178,7 @@ export function TargetCard() {
   }, [])
 
   return (
-    <section className="card target-card" id="target-card" ref={ref}>
+    <section className="card target-card" id="section-target" ref={ref}>
       <header className="card-head clickable" onClick={() => setOpen(!open)}>
         <button type="button" className="icon-btn" aria-label={open ? 'Collapse' : 'Expand'}>
           {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
@@ -177,7 +187,10 @@ export function TargetCard() {
           <Crosshair size={16} />
         </span>
         <h3>Target job</h3>
-        <span className="muted small head-note">{cv.target.role ? cv.target.role : 'optional · used by AI to tailor wording'}</span>
+        <span className="muted small head-note">
+          {cv.target.role || 'optional · used by AI to tailor wording'}
+          {match && ` · keyword match ${match.score}%`}
+        </span>
       </header>
       {open && (
         <div className="card-body">
@@ -189,6 +202,13 @@ export function TargetCard() {
               <AutoTextArea value={cv.target.jobDescription} minRows={4} onChange={(v) => mutate((d) => void (d.target.jobDescription = v))} placeholder="Paste the job ad here…" />
             </Field>
           </div>
+          <div className="ai-bar">
+            <button type="button" className="btn ai" onClick={check} disabled={ai.busy || !cv.target.jobDescription.trim()} title={cv.target.jobDescription.trim() ? undefined : 'Paste the job description first'}>
+              {ai.busy ? <Spinner /> : <Gauge size={15} />} {report ? 'Check again' : 'Check my fit with AI'}
+            </button>
+            <span className="muted small">Keyword match, must-haves vs nice-to-haves, gaps and what to confirm: a recruiter's first read.</span>
+          </div>
+          <JobReportView cv={cv} onClear={() => mutate((d) => void (d.target.report = null))} />
         </div>
       )}
     </section>

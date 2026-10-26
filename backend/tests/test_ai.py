@@ -362,3 +362,73 @@ def test_saved_keys_require_login(anon):
     assert anon.get("/api/ai/keys").status_code == 401
     assert anon.put("/api/ai/keys", json={"provider": {"type": "openai", "apiKey": "k"}}).status_code == 401
     assert anon.delete("/api/ai/keys/abc").status_code == 401
+
+
+# --------------------------------------------------------------------------- job match report and skills
+REPORT = """<think>compare</think>
+```json
+{"estimate": "72.4",
+ "keywords": [{"term": "Python", "kind": "must"}, {"term": "python", "kind": "must"},
+              {"term": "Ansible", "kind": "Must-have"}, {"term": "Grafana", "kind": "Nice to have"}],
+ "requirements": [{"text": "Network automation with Python", "kind": "must", "evidence": "Senior Network Engineer, Northwind Fibre"},
+                  {"text": "Ansible", "kind": "must", "evidence": "Not shown in the CV."}],
+ "strengths": ["Automated OTDR fault localisation"], "gaps": ["No Ansible"],
+ "questions": ["Have you used Ansible? Add it to a role if so.", "How many sites? [X] sites"],
+ "nextSteps": ["Lead with the automation work"],}
+```"""
+
+
+def test_tailor_task_returns_a_clean_report(client, fake):
+    rec = fake(ok_chat(REPORT))
+    r = gen(client, {"type": "openai", "apiKey": "k", "model": "m"}, task="tailor")
+    assert r.status_code == 200, r.text
+    report = r.json()["report"]
+    assert report["estimate"] == 72
+    assert [(k["term"], k["kind"]) for k in report["keywords"]] == [("Python", "must"), ("Ansible", "must"), ("Grafana", "nice")]
+    assert report["requirements"][0]["evidence"].startswith("Senior Network Engineer")
+    assert report["requirements"][1]["evidence"] == ""  # "Not shown in the CV." means no evidence
+    assert report["questions"][1].endswith("[X] sites")
+    msgs = json.loads(rec.requests[0].content)["messages"]
+    assert "exact spelling" in msgs[0]["content"] and "Use ONLY facts in the CV" in msgs[0]["content"]
+    assert "We need Python, Ansible and fibre network experience." in msgs[1]["content"]
+
+
+def test_tailor_needs_a_job_description(client, fake, server_key):
+    rec = fake(ok_chat(REPORT))
+    cv = json.loads(json.dumps(SAMPLE))
+    cv["target"]["jobDescription"] = "  "
+    r = client.post("/api/ai/generate", json={"provider": {"type": "openai"}, "task": "tailor", "cv": cv})
+    assert r.status_code == 400 and "job description" in r.json()["detail"]
+    assert not rec.requests  # nothing sent, and the shared key's daily count is untouched
+    assert gen(client, {"type": "openai"}).json()["remaining"] == 29
+
+
+@pytest.mark.parametrize("reply", ["Sorry, I can't help with that.", '{"estimate": 50}', "{not json"])
+def test_tailor_rejects_unusable_replies(client, fake, reply):
+    fake(ok_chat(reply))
+    r = gen(client, {"type": "openai", "apiKey": "k", "model": "m"}, task="tailor")
+    assert r.status_code == 502 and "expected format" in r.json()["detail"]
+
+
+def test_skills_task_keeps_only_skills_the_cv_shows(client, fake):
+    rec = fake(ok_chat('Here you go: {"groups": ['
+                       '{"title": "Automation", "skills": ["Python", "Ansible", "Kafka", "python"]},'
+                       '{"title": "Networking", "skills": ["FTTH", "GPON", "Kubernetes"]},'
+                       '{"title": "Empty", "skills": ["Terraform"]}]}'))
+    r = gen(client, {"type": "openai", "apiKey": "k", "model": "m"}, task="skills")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    # Kafka is only in a bullet and the tools list, still the CV's; Ansible is only in the job description
+    assert data["groups"] == [{"title": "Automation", "tags": ["Python", "Kafka"]}, {"title": "Networking", "tags": ["FTTH", "GPON"]}]
+    assert data["dropped"] == ["Ansible", "Kubernetes", "Terraform"]
+    assert "Never add a skill" in json.loads(rec.requests[0].content)["messages"][0]["content"]
+
+
+def test_parsing_helpers():
+    assert prompts.parse_json_object('Sure!\n{"a": [1, 2,],}\nHope that helps') == {"a": [1, 2]}
+    with pytest.raises(ValueError):
+        prompts.parse_json_object("[1, 2]")
+    assert prompts.parse_report('{"estimate": Infinity, "keywords": ["SQL"]}').estimate is None
+    text = "Built tools in C++ and Node.js; good at project  management"
+    assert prompts.mentions(text, "c++") and prompts.mentions(text, "Node.js") and prompts.mentions(text, "Project Management")
+    assert not prompts.mentions(text, "Go") and not prompts.mentions(text, "C")

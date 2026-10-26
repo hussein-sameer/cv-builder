@@ -1,4 +1,4 @@
-import type { AIConfig, AuthConfig, CV, CvMeta, CvRecord, GenerateOptions, ProviderSettings, ProviderType, SavedKey, SessionUser, TemplateInfo } from './types'
+import type { AIConfig, AiResult, AiTask, AuthConfig, CV, CvMeta, CvRecord, GenerateOptions, ProviderSettings, ProviderType, SavedKey, SessionUser, TemplateInfo } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') ?? ''
 
@@ -119,14 +119,9 @@ export const api = {
     return (await res.json()).models as string[]
   },
 
-  async generateSummary(type: ProviderType, p: ProviderSettings, cv: CV, options: GenerateOptions) {
-    const res = await post('/api/ai/generate', { provider: { type, ...p }, task: 'summary', cv, options })
-    return (await res.json()) as { text: string; model: string; remaining: number | null }
-  },
-
-  async generateBullets(type: ProviderType, p: ProviderSettings, cv: CV, options: GenerateOptions) {
-    const res = await post('/api/ai/generate', { provider: { type, ...p }, task: 'bullets', cv, options })
-    return (await res.json()) as { bullets: string[]; model: string; remaining: number | null }
+  async generate<T extends AiTask>(task: T, type: ProviderType, p: ProviderSettings, cv: CV, options: GenerateOptions): Promise<AiResult<T>> {
+    const res = await post('/api/ai/generate', { provider: { type, ...p }, task, cv, options })
+    return (await res.json()) as AiResult<T>
   },
 }
 

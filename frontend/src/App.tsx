@@ -68,6 +68,7 @@ function Shell() {
 
   const jump = (sectionId: string) => {
     setTab('edit')
+    if (sectionId === 'target') window.dispatchEvent(new CustomEvent('cv:open-target')) // opens the card if collapsed
     setTimeout(() => {
       const el = document.getElementById(`section-${sectionId}`)
       el?.scrollIntoView({ behavior: 'smooth', block: 'start' })

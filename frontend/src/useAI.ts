@@ -1,7 +1,9 @@
 import { useCallback, useState } from 'react'
 import { api } from './api'
 import { useStore } from './store'
-import type { GenerateOptions } from './types'
+import type { AiResult, AiTask, GenerateOptions } from './types'
+
+const DEFAULTS: GenerateOptions = { length: 'medium', tone: 'professional', language: 'English', instructions: '' }
 
 /** Wraps an AI call with readiness checks, a busy flag and error toasts. */
 export function useAI() {
@@ -18,28 +20,12 @@ export function useAI() {
     return true
   }, [aiReady, openAISettings, toast])
 
-  const summary = useCallback(
-    async (options: GenerateOptions) => {
+  const run = useCallback(
+    async <T extends AiTask>(task: T, options: Partial<GenerateOptions> = {}): Promise<AiResult<T> | null> => {
       if (!ensureReady()) return null
       setBusy(true)
       try {
-        return lowQuotaNotice(await api.generateSummary(ai.active, provider, cv, options))
-      } catch (e) {
-        toast((e as Error).message, 'error')
-        return null
-      } finally {
-        setBusy(false)
-      }
-    },
-    [ensureReady, ai.active, provider, cv, toast],
-  )
-
-  const bullets = useCallback(
-    async (options: GenerateOptions) => {
-      if (!ensureReady()) return null
-      setBusy(true)
-      try {
-        return lowQuotaNotice(await api.generateBullets(ai.active, provider, cv, options))
+        return lowQuotaNotice(await api.generate(task, ai.active, provider, cv, { ...DEFAULTS, ...options }))
       } catch (e) {
         toast((e as Error).message, 'error')
         return null
@@ -62,5 +48,11 @@ export function useAI() {
     return res
   }
 
-  return { busy, summary, bullets }
+  return {
+    busy,
+    summary: (o: GenerateOptions) => run('summary', o),
+    bullets: (o: GenerateOptions) => run('bullets', o),
+    tailor: (o?: Partial<GenerateOptions>) => run('tailor', o),
+    skills: (o?: Partial<GenerateOptions>) => run('skills', o),
+  }
 }

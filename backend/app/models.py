@@ -7,7 +7,7 @@ which keeps "add any section on demand" simple on both sides.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -94,9 +94,43 @@ class Design(_Base):
     pageSize: PageSize = "A4"
 
 
+_Note = Annotated[str, Field(max_length=600)]
+Kind = Literal["must", "nice"]
+
+
+class Keyword(_Base):
+    term: str = Field(max_length=80)  # the posting's exact wording
+    kind: Kind = "must"
+
+
+class Requirement(_Base):
+    text: str = Field(max_length=400)
+    kind: Kind = "must"
+    evidence: str = Field(default="", max_length=400)  # where the CV shows it; "" = it doesn't
+
+
+class JobReport(_Base):
+    """The AI's recruiter read of the CV against the target job. Shown in the editor, never printed.
+
+    The keyword match % is not stored: the editor recounts the keywords against the CV as it changes.
+    """
+
+    estimate: int | None = Field(default=None, ge=0, le=100)
+    keywords: list[Keyword] = Field(default_factory=list, max_length=40)
+    requirements: list[Requirement] = Field(default_factory=list, max_length=20)
+    strengths: list[_Note] = Field(default_factory=list, max_length=10)
+    gaps: list[_Note] = Field(default_factory=list, max_length=10)
+    questions: list[_Note] = Field(default_factory=list, max_length=10)
+    nextSteps: list[_Note] = Field(default_factory=list, max_length=10)
+    model: str = Field(default="", max_length=200)
+    createdAt: str = Field(default="", max_length=40)
+    jobKey: str = Field(default="", max_length=40)  # fingerprint of the role + job description it was made for
+
+
 class Target(_Base):
     role: str = Field(default="", max_length=300)
     jobDescription: str = Field(default="", max_length=20000)
+    report: JobReport | None = None
 
 
 class CV(_Base):

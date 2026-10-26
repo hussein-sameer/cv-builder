@@ -1,5 +1,5 @@
 import { SECTION_TYPES } from './sectionTypes'
-import type { CV, Item } from './types'
+import type { CV, Item, Keyword, Target } from './types'
 
 export type IssueLevel = 'error' | 'warn' | 'info'
 export interface Issue {
@@ -19,10 +19,13 @@ const YM = /^\s*(\d{4})(?:-(\d{1,2}))?\s*$/
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** Whole-word, case-insensitive occurrences of a term ("C++" and "Node.js" included). No lookbehind, for older Safari. */
+/**
+ * Whole-word, case-insensitive occurrences of a term; a trailing + or # is part of the word, so "C" isn't counted
+ * in "C++". No lookbehind, for older Safari. Mirrors backend prompts.mentions.
+ */
 export function countTerm(text: string, term: string): number {
   if (!term.trim()) return 0
-  const re = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(term.trim()).replace(/\s+/g, '\\s+')}(?![\\p{L}\\p{N}])`, 'giu')
+  const re = new RegExp(`(^|[^\\p{L}\\p{N}_])${escapeRe(term.trim()).replace(/\s+/g, '\\s+')}(?![\\p{L}\\p{N}_+#])`, 'giu')
   return (text.match(re) ?? []).length
 }
 
@@ -74,6 +77,45 @@ export function yearsOfExperience(cv: CV, today = new Date()): number | null {
 export function pageLimit(cv: CV): 1 | 2 {
   const yrs = yearsOfExperience(cv)
   return yrs !== null && yrs <= 5 ? 1 : 2
+}
+
+/** Every value printed on the CV (visible sections), without labels. Mirrors backend prompts.cv_plain_text. */
+export function cvText(cv: CV): string {
+  const parts = [cv.personal.headline]
+  for (const s of cv.sections.filter((x) => x.visible)) {
+    parts.push(s.content)
+    for (const it of s.items) parts.push(it.title, it.organization, it.description, it.grade, it.level, ...it.bullets, ...it.tags)
+  }
+  return parts.filter((x) => x && x.trim()).join('\n')
+}
+
+/** Fingerprint of the role + job description, to tell when a job report no longer matches them (FNV-1a). */
+export function jobKey(t: Target): string {
+  let h = 0x811c9dc5
+  for (const ch of `${t.role.trim()}\n${t.jobDescription.trim()}`) {
+    h ^= ch.codePointAt(0)!
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(16)
+}
+
+export interface KeywordHit extends Keyword {
+  found: boolean
+}
+
+/**
+ * Live keyword match against the last job report: the share of the posting's keywords that appear in the CV with
+ * its exact wording, must-haves counting double. Recomputed as the CV changes, so adding a missing term shows at once.
+ */
+export function keywordMatch(cv: CV): { score: number; hits: KeywordHit[] } | null {
+  const keywords = cv.target.report?.keywords ?? []
+  if (!keywords.length) return null
+  const text = cvText(cv)
+  const hits = keywords.map((k) => ({ ...k, found: countTerm(text, k.term) > 0 }))
+  const weight = (k: Keyword) => (k.kind === 'must' ? 2 : 1)
+  const total = hits.reduce((n, k) => n + weight(k), 0)
+  const got = hits.filter((k) => k.found).reduce((n, k) => n + weight(k), 0)
+  return { score: Math.round((100 * got) / total), hits }
 }
 
 /** "YYYY-MM" to compare end dates; ongoing entries sort as the most recent. */
@@ -196,6 +238,18 @@ export function atsCheck(cv: CV, pages: number | null): Issue[] {
   if (repeated.length) {
     const [term, n] = repeated[0]
     add('info', `“${term}” appears ${n} times in your summary and bullets. Once or twice where it's true is enough; repetition reads as keyword stuffing.`)
+  }
+
+  const report = cv.target.report
+  const match = report && report.jobKey === jobKey(cv.target) ? keywordMatch(cv) : null
+  if (match && match.score < 70) {
+    const missing = match.hits.filter((k) => !k.found && k.kind === 'must').map((k) => k.term)
+    const hint = missing.length ? ` Missing must-haves: ${missing.slice(0, 4).join(', ')}${missing.length > 4 ? '…' : ''} (add them only where they're true).` : ''
+    add(
+      match.score < 50 ? 'warn' : 'info',
+      `Keyword match with the target job is ${match.score}%. ${match.score < 50 ? 'Below 50% rarely passes ATS screening; aim for 70–80%.' : 'Aim for 70–80%.'}${hint}`,
+      'target',
+    )
   }
 
   if (pages !== null) {
