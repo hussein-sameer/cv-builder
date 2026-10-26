@@ -180,9 +180,9 @@ class _Writer:
         lb.paragraph_format.line_spacing = 1.05
 
         cp = self.d.core_properties
-        cp.title = f"{self.src.name} – CV" if self.src.name else "CV"
+        cp.title = f"{self.src.name} – {self.src.doc_title}" if self.src.name else self.src.doc_title
         cp.author = self.src.name or ""
-        cp.subject = "Curriculum Vitae"
+        cp.subject = self.src.subject
         cp.keywords = self.src.headline or ""
 
     # ----------------------------------------------------------------- parts
@@ -307,10 +307,15 @@ class _Writer:
             _run(sp, ln.sub, size=self.fs * 0.95, color=MUTED)
 
     def block(self, b: Block) -> None:
-        self.heading(b.heading)
+        if b.heading:
+            self.heading(b.heading)
         if b.kind == "paragraphs":
             for i, para in enumerate(b.paragraphs):
-                _run(self._p(space_after=3 if i < len(b.paragraphs) - 1 else 0), para)
+                p = self._p(space_after=b.gap if i < len(b.paragraphs) - 1 else 0)
+                for j, line in enumerate(para.split("\n")):
+                    r = _run(p, line)
+                    if j < para.count("\n"):
+                        r.add_break()
         elif b.kind == "entries":
             for e in b.entries:
                 self.entry(e)

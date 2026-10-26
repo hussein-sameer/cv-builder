@@ -219,7 +219,7 @@ async def _openai_chat(cfg, system, user, client) -> str:
 async def _anthropic_chat(cfg, system, user, client) -> str:
     body: dict = {
         "model": cfg.model,
-        "max_tokens": 1500,
+        "max_tokens": 3000,  # room for the job match report and cover letter, not just a summary
         "system": system,
         "messages": [{"role": "user", "content": user}],
     }

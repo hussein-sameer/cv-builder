@@ -1,4 +1,4 @@
-import type { AIConfig, AuthConfig, CV, CvMeta, CvRecord, GenerateOptions, ProviderSettings, ProviderType, SavedKey, SessionUser, TemplateInfo } from './types'
+import type { AIConfig, AiResult, AiTask, AuthConfig, CV, CvMeta, CvRecord, GenerateOptions, ProviderSettings, ProviderType, SavedKey, SessionUser, TemplateInfo } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') ?? ''
 
@@ -101,8 +101,9 @@ export const api = {
     return { data: await res.arrayBuffer(), pages: Number(res.headers.get('X-Page-Count') ?? 0) }
   },
 
-  async download(cv: CV, format: 'pdf' | 'docx', filename: string): Promise<void> {
-    const res = await post(`/api/export/${format}`, cv)
+  /** what: the CV itself, or its cover letter (target.coverLetter) with the same header */
+  async download(cv: CV, format: 'pdf' | 'docx', filename: string, what: 'cv' | 'letter' = 'cv'): Promise<void> {
+    const res = await post(`/api/export/${what === 'letter' ? 'letter/' : ''}${format}`, cv)
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -119,18 +120,24 @@ export const api = {
     return (await res.json()).models as string[]
   },
 
-  async generateSummary(type: ProviderType, p: ProviderSettings, cv: CV, options: GenerateOptions) {
-    const res = await post('/api/ai/generate', { provider: { type, ...p }, task: 'summary', cv, options })
-    return (await res.json()) as { text: string; model: string; remaining: number | null }
-  },
-
-  async generateBullets(type: ProviderType, p: ProviderSettings, cv: CV, options: GenerateOptions) {
-    const res = await post('/api/ai/generate', { provider: { type, ...p }, task: 'bullets', cv, options })
-    return (await res.json()) as { bullets: string[]; model: string; remaining: number | null }
+  async generate<T extends AiTask>(task: T, type: ProviderType, p: ProviderSettings, cv: CV, options: GenerateOptions): Promise<AiResult<T>> {
+    const res = await post('/api/ai/generate', { provider: { type, ...p }, task, cv, options })
+    return (await res.json()) as AiResult<T>
   },
 }
 
-export function fileName(cv: CV, ext: string): string {
-  const name = cv.personal.fullName.trim().replace(/[^\p{L}\p{N}\- ]/gu, '').replace(/\s+/g, '_')
-  return `${name ? name + '_CV' : 'CV'}.${ext}`
+const ROLE_CUT = /\s+[|·•–—-]\s+|[|·•,(]/
+
+function filePart(text: string, limit = 60): string {
+  const part = text.replace(/[^\p{L}\p{N}_\- ]/gu, '').trim().replace(/\s+/g, '_')
+  return part.length <= limit ? part : part.slice(0, limit).replace(/_[^_]*$/, '')
+}
+
+/**
+ * "Alex_Morgan_Network_Engineer_CV.pdf": the name and target role recruiters expect. The role is the Target job's
+ * role, else the headline up to its first separator. Mirrors backend layout.file_stem.
+ */
+export function fileName(cv: CV, ext: string, suffix = 'CV'): string {
+  const role = (cv.target.role.trim() || cv.personal.headline.trim()).split(ROLE_CUT)[0]
+  return [filePart(cv.personal.fullName), filePart(role), suffix].filter(Boolean).join('_') + '.' + ext
 }

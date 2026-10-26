@@ -36,6 +36,10 @@ interface Store {
   openAISettings: (open?: boolean) => void
   importOpen: boolean
   openImport: (open?: boolean) => void
+  letterOpen: boolean
+  openLetter: (open?: boolean) => void
+  linkedinOpen: boolean
+  openLinkedin: (open?: boolean) => void
   tourOpen: boolean
   openTour: (open?: boolean) => void
   /** Add an imported CV: a new library entry (server) or replaces the browser-only CV (Undo restores it). */
@@ -104,6 +108,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [savedKeys, setSavedKeys] = useState<SavedKey[]>([])
   const [aiModalOpen, setAIModalOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [letterOpen, setLetterOpen] = useState(false)
+  const [linkedinOpen, setLinkedinOpen] = useState(false)
   const [tourOpen, setTourOpen] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const lastSnapshot = useRef<number>(0)
@@ -396,6 +402,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       openAISettings: (open = true) => setAIModalOpen(open),
       importOpen,
       openImport: (open = true) => setImportOpen(open),
+      letterOpen,
+      openLetter: (open = true) => setLetterOpen(open),
+      linkedinOpen,
+      openLinkedin: (open = true) => setLinkedinOpen(open),
       tourOpen,
       openTour: (open = true) => setTourOpen(open),
       importCV,
@@ -403,7 +413,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toast,
       dismissToast,
     }),
-    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, savedKeys, aiReady, aiModalOpen, importOpen, importCV, tourOpen, toasts, toast, dismissToast],
+    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, savedKeys, aiReady, aiModalOpen, importOpen, letterOpen, linkedinOpen, importCV, tourOpen, toasts, toast, dismissToast],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

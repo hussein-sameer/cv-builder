@@ -36,9 +36,47 @@ class KeyRequest(BaseModel):
 
 class GenerateRequest(BaseModel):
     provider: ProviderConfig
-    task: Literal["summary", "bullets"]
+    task: Literal["summary", "bullets", "tailor", "skills", "letter", "linkedin"]
     cv: CV
     options: prompts.GenerateOptions = prompts.GenerateOptions()
+
+
+PROMPTS = {
+    "summary": prompts.summary_prompts,
+    "bullets": prompts.bullets_prompts,
+    "tailor": prompts.tailor_prompts,
+    "skills": prompts.skills_prompts,
+    "letter": prompts.letter_prompts,
+    "linkedin": prompts.linkedin_prompts,
+}
+
+
+def _result(task: str, raw: str, cv: CV) -> dict:
+    """The model's reply cleaned into the task's response; AIError when nothing usable came back."""
+    if task == "summary":
+        text = prompts.clean_summary(raw)
+        if not text:
+            raise AIError("The model returned an empty answer. Try again or pick another model.")
+        return {"text": text}
+    if task == "bullets":
+        bullets = prompts.clean_bullets(raw)
+        if not bullets:
+            raise AIError("The model returned no bullet points. Try again or pick another model.")
+        return {"bullets": bullets}
+    if task == "letter":
+        text = prompts.clean_letter(raw)
+        if not text:
+            raise AIError("The model returned an empty letter. Try again or pick another model.")
+        return {"text": text}
+    try:
+        if task == "tailor":
+            return {"report": prompts.parse_report(raw).model_dump()}
+        if task == "linkedin":
+            return prompts.parse_linkedin(raw)
+        groups, dropped = prompts.parse_skills(raw, cv)
+        return {"groups": groups, "dropped": dropped}
+    except ValueError as e:
+        raise AIError("The model's answer wasn't in the expected format. Try again, or pick a stronger model.") from e
 
 
 def _err(e: AIError) -> JSONResponse:
@@ -136,26 +174,15 @@ async def ai_generate(req: GenerateRequest, user: User = Depends(current_user)):
     remaining = None
     try:
         cfg, server_key = await run_in_threadpool(resolve, req.provider, True, _account_key(user, req.provider.type))
-        if req.task == "summary":
-            system, user_prompt = prompts.summary_prompts(req.cv, req.options)
-        else:
-            try:
-                system, user_prompt = prompts.bullets_prompts(req.cv, req.options)
-            except ValueError as e:
-                raise AIError(str(e), 400) from e
+        try:
+            system, user_prompt = PROMPTS[req.task](req.cv, req.options)
+        except ValueError as e:  # e.g. the entry or job description is missing: nothing to send yet
+            raise AIError(str(e), 400) from e
         if server_key:
             remaining = await run_in_threadpool(_count_server_key_use, user)
         async with make_client() as client:
             raw = await chat(cfg, system, user_prompt, client)
+        result = _result(req.task, raw, req.cv)
     except AIError as e:
         return _err(e)
-
-    if req.task == "summary":
-        text = prompts.clean_summary(raw)
-        if not text:
-            return _err(AIError("The model returned an empty answer. Try again or pick another model."))
-        return {"text": text, "model": cfg.model, "remaining": remaining}
-    bullets = prompts.clean_bullets(raw)
-    if not bullets:
-        return _err(AIError("The model returned no bullet points. Try again or pick another model."))
-    return {"bullets": bullets, "model": cfg.model, "remaining": remaining}
+    return {**result, "model": cfg.model, "remaining": remaining}

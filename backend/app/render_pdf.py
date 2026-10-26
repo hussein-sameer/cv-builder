@@ -144,14 +144,18 @@ def _line_flowables(ln: Line, st: _Styles) -> list:
 
 
 def _block_flowables(b: Block, st: _Styles, width: float, dates_first: bool) -> list:
-    out: list = [
-        Paragraph(f"<b>{_e(b.heading.upper())}</b>", st.heading),
-        HRFlowable(width="100%", thickness=0.6, color=st.heading.textColor, spaceBefore=1, spaceAfter=4),
-    ]
+    out: list = []
+    if b.heading:
+        out += [
+            Paragraph(f"<b>{_e(b.heading.upper())}</b>", st.heading),
+            HRFlowable(width="100%", thickness=0.6, color=st.heading.textColor, spaceBefore=1, spaceAfter=4),
+        ]
+    else:  # the cover letter's body: a line's gap below the header, like the DOCX's empty paragraph
+        out.append(Spacer(1, st.body.fontSize))
     if b.kind == "paragraphs":
         for p in b.paragraphs:
-            out.append(Paragraph(_e(p), st.body))
-            out.append(Spacer(1, 3))
+            out.append(Paragraph(_e(p).replace("\n", "<br/>"), st.body))
+            out.append(Spacer(1, b.gap))
     elif b.kind == "entries":
         for e in b.entries:
             out.extend(_entry_flowables(e, st, width, dates_first))
@@ -178,9 +182,9 @@ def render_pdf(doc: RenderDoc) -> tuple[bytes, int]:
         rightMargin=margin_x,
         topMargin=margin_y,
         bottomMargin=margin_y,
-        title=f"{doc.name} – CV" if doc.name else "CV",
+        title=f"{doc.name} – {doc.doc_title}" if doc.name else doc.doc_title,
         author=doc.name or "",
-        subject="Curriculum Vitae",
+        subject=doc.subject,
         creator="CV Builder",
     )
     width = pdf.width - 12  # Frame has 6pt padding on each side

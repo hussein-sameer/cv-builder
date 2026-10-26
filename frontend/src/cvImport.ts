@@ -208,7 +208,10 @@ export function parseCvText(text: string): CV {
     personal,
     sections,
     design: coerceDesign(raw.design),
-    target: isRec(raw.target) ? { role: str(raw.target.role), jobDescription: str(raw.target.jobDescription) } : undefined,
+    // a CV Builder export's job report is left out: it's re-run, not trusted from a file
+    target: isRec(raw.target)
+      ? { role: str(raw.target.role), jobDescription: str(raw.target.jobDescription), coverLetter: str(raw.target.coverLetter), recipient: str(raw.target.recipient) }
+      : undefined,
   })
   if (!cv.personal.fullName && !cv.sections.length) throw new Error('No CV details found in this JSON.')
   return cv

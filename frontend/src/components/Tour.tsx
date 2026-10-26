@@ -36,8 +36,13 @@ const STEPS: Step[] = [
   },
   {
     title: 'Start with your details',
-    body: 'Name, contact details and, for countries that expect one, a photo. The EU / UK extras (nationality, work permit, date of birth) are just below.',
+    body: 'Name, contact details and, for countries that expect one, a photo. The EU / UK extras (nationality, date of birth, driving licence) are just below.',
     targets: ['personal'],
+  },
+  {
+    title: 'Aim at a job',
+    body: 'Paste the job ad here. “Check my fit” shows your keyword match, must-haves and gaps the way a recruiter reads them, and the cover letter and LinkedIn drafts start here too.',
+    targets: ['target'],
   },
   {
     title: 'Add the sections you need',
@@ -56,7 +61,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'ATS check',
-    body: 'Flags what trips up applicant tracking systems: missing dates, weak bullet openers, placeholders left to fill in. Click an issue to jump to it.',
+    body: 'Flags what trips up applicant tracking systems and recruiters: missing dates, weak bullet openers, roles out of order, placeholders left to fill in, a CV longer than your experience calls for. Click an issue to jump to it.',
     targets: ['ats'],
     optional: true,
   },

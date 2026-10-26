@@ -29,13 +29,15 @@ CV Builder is a multi-user web application for writing applicant-tracking-system
 
 ### Editor
 
-- **Personal details** with a country-code phone picker, a date-of-birth calendar and an optional photo, printed top right and cropped to passport proportions (28 × 36 mm).
+- **Personal details** with a country-code phone picker, a date-of-birth calendar, a work permit / relocation line (printed in both layouts) and an optional photo, printed top right and cropped to passport proportions (28 × 36 mm).
 - **Sections on demand:** experience, education, skills, languages, certifications, projects, courses, volunteering, awards, publications, interests, references, and custom entry or free-text sections. Every section can be renamed, reordered, hidden or deleted.
-- **Two layouts:** *International* (title first, month-name dates) and *EU / UK* (dates first, personal details block with nationality, work permit, date of birth and driving licence, CEFR language levels). Both are single column.
-- **Design options:** font (Calibri, Arial, Cambria, Times New Roman, Georgia), size, accent colour, A4 or Letter.
-- **ATS check:** flags missing contact details, missing dates, weak bullet openers, unfilled `[X%]` placeholders, emoji and page count, with links to the affected section.
+- **Two layouts:** *International* (title first, month-name dates, no personal details beyond the work permit line) and *EU / UK* (dates first, personal details block with nationality, work permit, date of birth and driving licence, CEFR language levels). Both are single column.
+- **Design options:** font (Calibri, Arial, Cambria, Times New Roman, Georgia), size (10–12 pt), accent colour, A4 or Letter.
+- **ATS check:** flags missing contact details, missing dates, weak bullet openers and "I/my", unfilled `[X%]` placeholders, emoji, roles out of reverse-chronological order, more than 6 (or fewer than 3) bullets on recent roles, non-CEFR language levels, duplicate skills, a skill repeated so often it reads as keyword stuffing, a font size outside 10–12 pt and a photo, with links to the affected section. The page limit follows experience: one page up to 5 years (worked out from the dates), two pages above.
 - **Editing comforts:** undo (Ctrl+Z), collapse and expand all entries, light, dark and system themes, and a responsive layout down to phone width.
 - **Guided tour** for new accounts, replayable from the ⋯ menu.
+
+- **File names** follow the `FirstName_LastName_TargetRole_CV.pdf` convention, using the target role (or the headline up to its first `|`).
 
 ### Live preview
 
@@ -46,6 +48,10 @@ The server renders the real PDF on every change (debounced), and the browser dra
 - **Generate with AI** drafts the profile summary; **Improve / Draft with AI** rewrites the bullet points of an entry. Suggestions are reviewed before they are applied.
 - Prompts restrict the model to facts already in the CV. Where a figure would strengthen a bullet, the model inserts an `[X%]`-style placeholder, which the ATS check reports.
 - A **target job** (role and job description) can be attached to each CV; it tailors the AI's wording and is never printed.
+- **Check my fit with AI** reads the CV against the job description like a recruiter: the posting's keywords in its exact wording, split into must-haves and nice-to-haves, each requirement with the CV's evidence (or "not shown"), strongest selling points, biggest gaps, questions to confirm before adding anything, next steps and an overall estimate. The keyword match % is recounted live as the CV changes (aim for 70–80%; the ATS check warns below 50%). The report is saved with the CV.
+- **Cover letter:** three short paragraphs (why this role at this company, the evidence, a call to action) written with AI from the CV and job description, or by hand. It's saved with the CV and downloads as a DOCX or PDF with the CV's header, today's date and the recipient's address.
+- **LinkedIn headline and About** drafted from the CV within LinkedIn's limits (220 and 2,600 characters, keywords before the "See more" fold), with a short profile checklist. They are not stored.
+- **Tailor skills with AI** regroups and reorders the Skills section for the job, using only skills the CV already shows; anything else the model suggests is listed as "not added" instead.
 - Supported providers: any OpenAI-compatible API (OpenAI, OpenRouter, Groq, DeepSeek, Mistral, LM Studio, vLLM…), Anthropic, Google Gemini and Ollama.
 
 ### Upload CV with AI
@@ -238,6 +244,7 @@ Interactive OpenAPI documentation is served at `/docs`.
 | `GET` | `/api/meta` | Templates, default headings, resolved PDF fonts |
 | `POST` | `/api/export/pdf` | CV JSON → PDF (`X-Page-Count` header; `?inline=true` for preview) |
 | `POST` | `/api/export/docx` | CV JSON → DOCX |
+| `POST` | `/api/export/letter/pdf`, `/api/export/letter/docx` | The CV's cover letter (`target.coverLetter`) with the CV's header |
 | `GET` | `/api/auth/config`, `/api/auth/me` | Whether sign-up is open; current user |
 | `POST` | `/api/auth/signup`, `/login`, `/logout`, `/password`, `/delete-account` | Accounts and cookie sessions |
 | `POST` | `/api/auth/tour-done` | Mark the guided tour as finished for the account |
@@ -247,7 +254,7 @@ Interactive OpenAPI documentation is served at `/docs`.
 | `GET` / `PUT` | `/api/ai/keys` | List saved keys (provider, base URL, last four characters) / save one |
 | `DELETE` | `/api/ai/keys/{id}` | Remove a saved key |
 | `POST` | `/api/ai/models` | List a provider's models (connection test) |
-| `POST` | `/api/ai/generate` | `task: "summary" \| "bullets"` → `{text}` / `{bullets}` |
+| `POST` | `/api/ai/generate` | `task: "summary" \| "bullets" \| "letter" \| "linkedin" \| "tailor" \| "skills"` → `{text}` / `{bullets}` / `{text}` / `{headline, about}` / `{report}` / `{groups, dropped}` |
 
 ## Testing
 
@@ -272,7 +279,7 @@ The backend suite covers:
 backend/app/
   main.py          FastAPI app: middleware, export endpoints, static UI
   models.py        Pydantic CV schema (shared shape with the UI)
-  layout.py        templates and CV → render IR
+  layout.py        templates and CV (or cover letter) → render IR
   render_docx.py   DOCX writer
   render_pdf.py    PDF writer (embedded TrueType fonts)
   fonts.py         font discovery with metric-compatible fallbacks

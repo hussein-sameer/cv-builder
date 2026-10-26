@@ -1,10 +1,12 @@
 import { AlertCircle, CheckCircle2, Compass, Eye, PencilLine, ShieldCheck, Sparkle, WandSparkles, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { atsCheck } from './atsCheck'
+import { atsCheck, pageLimit } from './atsCheck'
 import { AiSettingsModal } from './components/AiSettingsModal'
 import { AtsPanel } from './components/AtsPanel'
+import { CoverLetterModal } from './components/CoverLetterModal'
 import { AddSection, PersonalCard, TargetCard } from './components/EditorCards'
 import { ImportCvModal } from './components/ImportCvModal'
+import { LinkedInModal } from './components/LinkedInModal'
 import { SectionCard } from './components/SectionCard'
 import { TopBar } from './components/TopBar'
 import { Tour } from './components/Tour'
@@ -68,6 +70,7 @@ function Shell() {
 
   const jump = (sectionId: string) => {
     setTab('edit')
+    if (sectionId === 'target') window.dispatchEvent(new CustomEvent('cv:open-target')) // opens the card if collapsed
     setTimeout(() => {
       const el = document.getElementById(`section-${sectionId}`)
       el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -125,7 +128,7 @@ function Shell() {
         <aside className="preview" data-tour="preview">
           <div className="preview-head">
             <span className="preview-title">Live preview</span>
-            {pages !== null && <span className={`badge ${pages > 2 ? 'warn' : ''}`}>{pages} page{pages === 1 ? '' : 's'}</span>}
+            {pages !== null && <span className={`badge ${pages > pageLimit(cv) ? 'warn' : ''}`}>{pages} page{pages === 1 ? '' : 's'}</span>}
             <button type="button" className={`ats-toggle ${errors ? 'err' : warns ? 'warn' : 'ok'}`} onClick={() => setAtsOpen(!atsOpen)} aria-expanded={atsOpen} data-tour="ats">
               {errors || warns ? <AlertCircle size={15} /> : issues.length ? <ShieldCheck size={15} /> : <CheckCircle2 size={15} />}
               ATS check
@@ -141,6 +144,8 @@ function Shell() {
 
       <AiSettingsModal />
       <ImportCvModal />
+      <CoverLetterModal />
+      <LinkedInModal />
       <Tour />
 
       <div className="toasts" aria-live="polite">

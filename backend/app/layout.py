@@ -12,7 +12,7 @@ from __future__ import annotations
 import base64
 import io
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from functools import lru_cache
 from typing import Literal
@@ -22,6 +22,8 @@ from PIL import Image, ImageOps
 from .models import CV, Item, Section
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+FULL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+               "November", "December"]
 
 
 # --------------------------------------------------------------------------- #
@@ -36,7 +38,7 @@ class TemplateSpec:
     date_style: Literal["month_name", "numeric"]
     present_word: str
     entry_style: Literal["title_first", "dates_first"]
-    show_personal_details: bool
+    personal_details: tuple[str, ...]  # Personal fields printed in the details line, in this order
     headings: dict[str, str]
 
 
@@ -57,13 +59,15 @@ TEMPLATES: dict[str, TemplateSpec] = {
     "international": TemplateSpec(
         key="international",
         name="International ATS",
-        description="Single column, standard headings, no personal details such as date of birth. "
+        description="Single column, standard headings, no personal details such as date of birth or nationality "
+        "(only your work permit / relocation line). "
         "Safest choice for applicant tracking systems in the US, Gulf and most global employers.",
         default_font="Calibri",
         date_style="month_name",
         present_word="Present",
         entry_style="title_first",
-        show_personal_details=False,
+        # work authorisation belongs in the header for every market; the rest is EU-only
+        personal_details=("workPermit",),
         headings={
             "summary": "Professional Summary",
             "experience": "Experience",
@@ -82,7 +86,7 @@ TEMPLATES: dict[str, TemplateSpec] = {
         date_style="numeric",
         present_word="Present",
         entry_style="dates_first",
-        show_personal_details=True,
+        personal_details=("nationality", "dateOfBirth", "workPermit", "drivingLicence"),
         headings={
             "summary": "Profile",
             "experience": "Work Experience",
@@ -114,6 +118,9 @@ SECTION_KIND: dict[str, str] = {
 }
 
 TAGS_LABEL = {"experience": "Tools", "projects": "Technologies", "volunteering": "Skills", "custom": "Keywords"}
+
+DETAIL_LABELS = {"nationality": "Nationality", "dateOfBirth": "Date of birth", "workPermit": "Work permit",
+                 "drivingLicence": "Driving licence"}
 
 
 # --------------------------------------------------------------------------- #
@@ -149,9 +156,10 @@ class Line:
 
 @dataclass
 class Block:
-    heading: str
+    heading: str  # "" = no heading (the cover letter's body)
     kind: Literal["paragraphs", "entries", "pairs", "lines"]
-    paragraphs: list[str] = field(default_factory=list)
+    paragraphs: list[str] = field(default_factory=list)  # a "\n" inside one is a line break
+    gap: float = 3  # points between paragraphs
     entries: list[Entry] = field(default_factory=list)
     pairs: list[tuple[str, str]] = field(default_factory=list)
     lines: list[Line] = field(default_factory=list)
@@ -170,6 +178,8 @@ class RenderDoc:
     accent: str
     page_size: str
     photo: bytes | None = None  # normalised JPEG, PHOTO_PX, or None
+    doc_title: str = "CV"  # file metadata: "<name> – CV"
+    subject: str = "Curriculum Vitae"
 
 
 # --------------------------------------------------------------------------- #
@@ -386,15 +396,10 @@ def build_document(cv: CV) -> RenderDoc:
             contacts.append(Link(_display_url(url), _href(url)))
 
     details: list[tuple[str, str]] = []
-    if spec.show_personal_details:
-        for label, value in (
-            ("Nationality", p.nationality),
-            ("Date of birth", format_birth_date(p.dateOfBirth)),
-            ("Work permit", p.workPermit),
-            ("Driving licence", p.drivingLicence),
-        ):
-            if value.strip():
-                details.append((label, _clean(value)))
+    for key in spec.personal_details:
+        value = format_birth_date(p.dateOfBirth) if key == "dateOfBirth" else getattr(p, key)
+        if value.strip():
+            details.append((DETAIL_LABELS[key], _clean(value)))
 
     blocks = [b for s in cv.sections if s.visible and (b := build_block(s, spec))]
 
@@ -413,10 +418,52 @@ def build_document(cv: CV) -> RenderDoc:
     )
 
 
-def file_stem(cv: CV) -> str:
-    name = re.sub(r"[^\w\- ]", "", cv.personal.fullName, flags=re.UNICODE).strip()
-    name = re.sub(r"\s+", "_", name)
-    return f"{name}_CV" if name else "CV"
+_ROLE_CUT_RE = re.compile(r"\s+[|·•–—-]\s+|[|·•,(]")
+
+
+def _file_part(text: str, limit: int = 60) -> str:
+    part = re.sub(r"\s+", "_", re.sub(r"[^\w\- ]", "", text, flags=re.UNICODE).strip())
+    return part if len(part) <= limit else part[:limit].rsplit("_", 1)[0]
+
+
+def file_stem(cv: CV, suffix: str = "CV") -> str:
+    """'Alex_Morgan_Network_Engineer_CV': the name and target role recruiters expect in the file name.
+
+    The role is the Target job's role, else the headline up to its first separator ("Senior Engineer | Python"
+    gives "Senior_Engineer"). Mirrors frontend api.fileName.
+    """
+    role = _ROLE_CUT_RE.split(cv.target.role.strip() or cv.personal.headline.strip(), maxsplit=1)[0]
+    return "_".join([x for x in (_file_part(cv.personal.fullName), _file_part(role)) if x] + [suffix])
+
+
+def format_letter_date(d: date) -> str:
+    """'26 October 2026': unambiguous in every market (no 10/26 vs 26/10)."""
+    return f"{d.day} {FULL_MONTHS[d.month - 1]} {d.year}"
+
+
+def build_letter(cv: CV, today: date | None = None) -> RenderDoc:
+    """The cover letter: the CV's header (name, target title, contacts), the date, the recipient, then the text.
+
+    Same IR and renderers as the CV, so the letter matches it and stays ATS-safe. No photo or personal details.
+    Line breaks typed in the letter (an address, a sign-off) are kept.
+    """
+    doc = build_document(cv)
+
+    def lines(text: str) -> str:
+        return "\n".join(_clean(x) for x in text.replace("\r", "").split("\n") if x.strip())
+
+    body = [lines(p) for p in re.split(r"\n\s*\n", cv.target.coverLetter.replace("\r", "")) if p.strip()]
+    recipient = lines(cv.target.recipient)
+    paragraphs = [format_letter_date(today or date.today()), *([recipient] if recipient else []), *body]
+    return replace(
+        doc,
+        headline=_clean(cv.target.role) or doc.headline,
+        details=[],
+        photo=None,
+        blocks=[Block("", "paragraphs", paragraphs=paragraphs, gap=doc.font_size * 0.9)],
+        doc_title="Cover letter",
+        subject="Cover letter",
+    )
 
 
 def years_of_experience(cv: CV, today: date | None = None) -> float | None:

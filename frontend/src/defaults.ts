@@ -60,7 +60,7 @@ export function emptyCV(): CV {
     },
     sections: (['summary', 'experience', 'education', 'skills'] as SectionType[]).map((t) => newSection(t)),
     design: { template: 'international', fontFamily: null, fontSize: 10.5, accentColor: '#1F3864', pageSize: 'A4' },
-    target: { role: '', jobDescription: '' },
+    target: { role: '', jobDescription: '', report: null, coverLetter: '', recipient: '' },
   }
 }
 
@@ -205,6 +205,6 @@ export function exampleCV(): CV {
       }),
     ],
     design: { template: 'international', fontFamily: null, fontSize: 10.5, accentColor: '#1F3864', pageSize: 'A4' },
-    target: { role: '', jobDescription: '' },
+    target: { role: '', jobDescription: '', report: null, coverLetter: '', recipient: '' },
   }
 }

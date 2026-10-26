@@ -9,7 +9,7 @@ from docx import Document
 from PIL import Image
 from pypdf import PdfReader
 
-from app.layout import build_document, format_birth_date, format_date, profile_url, years_of_experience
+from app.layout import build_document, file_stem, format_birth_date, format_date, profile_url, years_of_experience
 from app.models import CV
 
 SAMPLE = json.loads((Path(__file__).parent / "sample_cv.json").read_text())
@@ -27,12 +27,13 @@ def test_pdf_is_text_based_and_complete(client, template):
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
     assert r.headers["x-page-count"] == "1"
-    assert "Alex_Morgan_CV.pdf" in r.headers["content-disposition"]
+    assert "Alex_Morgan_Network_Automation_Engineer_CV.pdf" in r.headers["content-disposition"]
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(r.content)).pages)
     for needle in ("Alex Morgan", "alex.morgan@example.com", "Northwind Fibre",
                    "cutting mean time to repair by 30%", "Python, Kafka", "German"):
         assert needle in text
     assert "Hidden section" not in text  # invisible sections are skipped
+    assert "Eligible to work in the UK and EU" in text  # work authorisation is printed in both layouts
     if template == "europass":
         assert "WORK EXPERIENCE" in text and "Nationality" in text and "03/2021" in text
     else:
@@ -157,6 +158,30 @@ def test_photo_is_normalised_and_bad_photos_are_handled(client):
     assert r.status_code == 200 and b"word/media/" not in r.content
 
 
+def test_file_name_has_name_and_target_role():
+    def stem(name="Alex Morgan", role="", headline=""):
+        return file_stem(CV.model_validate({"personal": {"fullName": name, "headline": headline}, "target": {"role": role}}))
+
+    assert stem(role="Network Automation Engineer", headline="Senior Network Engineer") == "Alex_Morgan_Network_Automation_Engineer_CV"
+    # no target role: the headline, cut at its first separator
+    assert stem(headline="Senior Fiber Maintenance Engineer | Python, SQL | Baghdad") == "Alex_Morgan_Senior_Fiber_Maintenance_Engineer_CV"
+    assert stem(headline="Full-Stack Developer – React") == "Alex_Morgan_Full-Stack_Developer_CV"
+    assert stem() == "Alex_Morgan_CV"
+    assert stem(name="", role="DevOps Engineer") == "DevOps_Engineer_CV"
+    assert stem(name="Zoë Müller", role="C++ / Qt Developer") == "Zoë_Müller_C_Qt_Developer_CV"
+    long = stem(role="Principal " + "Very " * 20 + "Senior Engineer")
+    assert len(long) < 80 and long.endswith("_Very_CV")  # clipped on a word boundary
+
+
+def test_work_permit_only_detail_in_international_layout():
+    data = _cv()
+    doc = build_document(CV.model_validate(data))
+    assert doc.details == [("Work permit", "Eligible to work in the UK and EU")]
+    data["design"]["template"] = "europass"
+    labels = [k for k, _ in build_document(CV.model_validate(data)).details]
+    assert labels == ["Nationality", "Work permit", "Driving licence"]
+
+
 def test_birth_date_and_phone_code_only():
     assert format_birth_date("1990-03-15") == "15/03/1990"
     assert format_birth_date("15 March 1990") == "15 March 1990"  # older free text kept as typed
@@ -182,3 +207,59 @@ def test_profile_links_point_at_the_profile():
     data["personal"].update(linkedin="linkedin.com", github="alexmorgan", website="")
     urls = [c.url for c in build_document(CV.model_validate(data)).contacts if c.url.startswith("https://")]
     assert urls == ["https://github.com/alexmorgan"]
+
+
+LETTER = "Dear Hiring Manager,\n\nI'm applying for the Network Automation Engineer role.\n\nI'd welcome a call.\n\nKind regards,\nAlex Morgan"
+
+
+def _letter_cv(template="international") -> dict:
+    data = _cv(template)
+    data["personal"]["photo"] = _photo()
+    data["target"].update(coverLetter=LETTER, recipient="Hiring Team\nContoso Networks\n1 Example Street, Leeds")
+    return data
+
+
+def test_letter_layout():
+    from datetime import date
+
+    from app.layout import build_letter
+
+    doc = build_letter(CV.model_validate(_letter_cv("europass")), today=date(2026, 10, 26))
+    assert doc.headline == "Network Automation Engineer" and doc.photo is None and doc.details == []
+    assert [b.heading for b in doc.blocks] == [""]
+    paras = doc.blocks[0].paragraphs
+    assert paras[:2] == ["26 October 2026", "Hiring Team\nContoso Networks\n1 Example Street, Leeds"]
+    assert paras[-1] == "Kind regards,\nAlex Morgan"
+
+
+@pytest.mark.parametrize("template", ["international", "europass"])
+def test_letter_exports(client, template):
+    data = _letter_cv(template)
+    r = client.post("/api/export/letter/pdf", json=data)
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert "Alex_Morgan_Network_Automation_Engineer_Cover_Letter.pdf" in r.headers["content-disposition"]
+    pdf = PdfReader(io.BytesIO(r.content))
+    text = pdf.pages[0].extract_text()
+    assert pdf.metadata.title == "Alex Morgan – Cover letter" and not pdf.pages[0].images  # no photo on the letter
+    for needle in ("Alex Morgan", "alex.morgan@example.com", "Contoso Networks", "Dear Hiring Manager,", "I'd welcome a call."):
+        assert needle in text
+    assert text.index("Contoso Networks") < text.index("Dear Hiring Manager") < text.index("Kind regards")
+    assert "Nationality" not in text and "Northwind Fibre" not in text  # the letter only, not the CV
+
+    r = client.post("/api/export/letter/docx", json=data)
+    assert r.status_code == 200 and "Cover_Letter.docx" in r.headers["content-disposition"]
+    doc = Document(io.BytesIO(r.content))
+    assert len(doc.tables) == 0 and not [p for p in doc.paragraphs if p.style.name == "Heading 1"]
+    body = [p.text for p in doc.paragraphs]
+    assert "Hiring Team\nContoso Networks\n1 Example Street, Leeds" in body and "Kind regards,\nAlex Morgan" in body
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        assert "<w:drawing" not in z.read("word/document.xml").decode()
+
+
+def test_letter_export_errors(client):
+    assert client.post("/api/export/letter/pdf", json=_cv()).status_code == 400  # nothing written yet
+    assert client.post("/api/export/letter/odt", json=_letter_cv()).status_code == 422
+
+
+def test_letter_export_requires_login(anon):
+    assert anon.post("/api/export/letter/pdf", json=_letter_cv()).status_code == 401

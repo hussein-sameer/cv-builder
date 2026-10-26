@@ -311,6 +311,44 @@ select.input { padding-right: 4px; }
 .hint-link { align-self: flex-start; border: 0; background: none; padding: 0; color: var(--ai); font-size: 12.5px; font-weight: 550; }
 .hint-link:hover { text-decoration: underline; }
 
+/* job match report (Target job card) */
+.job-report { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.job-report p { margin: 0; line-height: 1.45; }
+.scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.score { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 4px 8px; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); }
+.score-label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.score strong { font-size: 20px; line-height: 1; }
+.score .meter { grid-column: 1 / -1; height: 6px; border-radius: 99px; background: var(--count-bg); overflow: hidden; }
+.score .meter span { display: block; height: 100%; border-radius: inherit; background: currentColor; }
+.score > .muted { grid-column: 1 / -1; }
+.score.ok strong, .score.ok .meter { color: var(--ok); }
+.score.warn strong, .score.warn .meter { color: var(--warn); }
+.score.low strong, .score.low .meter { color: var(--danger); }
+.report-group h4 { margin: 0 0 6px; font-size: 11.5px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.keyword-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.keyword-list li { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 12.5px; font-weight: 550; border: 1px solid var(--line-2); }
+.keyword-list li.found { background: var(--ok-soft); color: var(--ok); border-color: var(--ok-border); }
+.keyword-list li.missing { background: var(--panel-2); color: var(--ink-2); border-style: dashed; }
+.requirements, .report-notes { margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; }
+.requirements { list-style: none; }
+.requirements li { display: flex; gap: 8px; align-items: flex-start; }
+.requirements li > svg { flex: none; margin-top: 3px; }
+.requirements li.found > svg { color: var(--ok); }
+.requirements li.missing > svg { color: var(--danger); }
+.requirements .kind { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 5px; border-radius: 4px; background: var(--primary-soft); color: var(--primary-text); }
+.requirements .kind.nice { background: var(--bg); color: var(--muted); }
+.report-notes { padding-left: 18px; }
+.job-report mark { background: var(--mark-bg); color: var(--mark-ink); border-radius: 3px; padding: 0 2px; }
+.report-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.target-card .card-body > p.muted { margin: -4px 0 0; line-height: 1.45; }
+
+/* cover letter and LinkedIn modals */
+.ai-bar .grow { flex: 1; min-width: 200px; }
+.letter-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: -6px; }
+.checklist { border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; background: var(--panel-2); font-size: 13px; }
+.checklist summary { cursor: pointer; font-weight: 600; color: var(--ink-2); }
+.checklist ul { margin: 8px 0 2px; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; line-height: 1.45; }
+
 /* ------------------------------------------------------------- add section */
 .add-section { display: flex; flex-direction: column; gap: 10px; }
 .section-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; box-shadow: var(--shadow); }

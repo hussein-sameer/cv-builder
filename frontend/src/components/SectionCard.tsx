@@ -1,9 +1,9 @@
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, Lightbulb, Plus, SlidersHorizontal, Sparkles, Undo2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Eye, EyeOff, Lightbulb, Plus, SlidersHorizontal, Sparkles, Undo2, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { emptyItem } from '../defaults'
 import { SECTION_TYPES } from '../sectionTypes'
 import { findSection, moveInArray, useStore } from '../store'
-import type { GenerateOptions, Section } from '../types'
+import type { AiResult, GenerateOptions, Section } from '../types'
 import { useAI } from '../useAI'
 import { AutoTextArea, Field, TextInput } from './fields'
 import { ItemCard, RowItem } from './ItemCard'
@@ -124,6 +124,8 @@ export function SectionCard({ section, index, count }: { section: Section; index
               <Plus size={15} /> Add {def.addLabel}
             </button>
           )}
+
+          {section.type === 'skills' && <SkillsTailor section={section} />}
         </div>
       )}
     </section>
@@ -222,5 +224,61 @@ function SummaryEditor({ section, onChange }: { section: Section; onChange: (v: 
         </button>
       )}
     </div>
+  )
+}
+
+/** Regroup and reorder the skills for the target job. The server drops any skill the CV doesn't show. */
+function SkillsTailor({ section }: { section: Section }) {
+  const { cv, mutate } = useStore()
+  const ai = useAI()
+  const [suggestion, setSuggestion] = useState<AiResult<'skills'> | null>(null)
+  const forJob = !!(cv.target.role.trim() || cv.target.jobDescription.trim())
+  const kept = new Set(suggestion?.groups.flatMap((g) => g.tags.map((t) => t.toLowerCase())))
+  const leftOut = suggestion ? [...new Set(section.items.flatMap((it) => it.tags.map((t) => t.trim())))].filter((t) => t && !kept.has(t.toLowerCase())) : []
+
+  const apply = () => {
+    if (!suggestion) return
+    mutate((d) => void (findSection(d, section.id).items = suggestion.groups.map((g) => emptyItem({ title: g.title, tags: g.tags }))))
+    setSuggestion(null)
+  }
+
+  return (
+    <>
+      <div className="ai-bar">
+        <button type="button" className="btn ai sm" onClick={async () => setSuggestion(await ai.skills())} disabled={ai.busy}>
+          {ai.busy ? <Spinner /> : <Sparkles size={14} />} {forJob ? 'Tailor to the target job with AI' : 'Regroup with AI'}
+        </button>
+        <span className="muted small">Only skills your CV already shows, grouped and ordered{forJob ? ' for the job' : ''}.</span>
+      </div>
+      {suggestion && (
+        <div className="suggestion">
+          <div className="suggestion-head">
+            <Sparkles size={14} /> AI suggestion <span className="muted">· {suggestion.model}</span>
+          </div>
+          <ul>
+            {suggestion.groups.map((g, i) => (
+              <li key={i}>
+                {g.title && <strong>{g.title}: </strong>}
+                {g.tags.join(', ')}
+              </li>
+            ))}
+          </ul>
+          {suggestion.dropped.length > 0 && (
+            <p className="muted small">
+              Not added because your CV doesn't show them: {suggestion.dropped.join(', ')}. If you have them, add them to a role or project first.
+            </p>
+          )}
+          {leftOut.length > 0 && <p className="muted small">Left out of your current list: {leftOut.join(', ')}.</p>}
+          <div className="suggestion-actions">
+            <button type="button" className="btn primary xs" onClick={apply}>
+              <Check size={13} /> Replace skills
+            </button>
+            <button type="button" className="btn ghost xs" onClick={() => setSuggestion(null)}>
+              <X size={13} /> Discard
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
