@@ -432,3 +432,55 @@ def test_parsing_helpers():
     text = "Built tools in C++ and Node.js; good at project  management"
     assert prompts.mentions(text, "c++") and prompts.mentions(text, "Node.js") and prompts.mentions(text, "Project Management")
     assert not prompts.mentions(text, "Go") and not prompts.mentions(text, "C")
+
+
+# --------------------------------------------------------------------------- cover letter and LinkedIn
+LETTER = """Sure! Here is your cover letter:
+
+Dear Hiring Manager,
+
+I'm applying for the Network Automation Engineer role because automating fibre operations is the work I enjoy
+most, and [what draws you to the company].
+
+At Northwind Fibre I automated OTDR fault localisation with Python and Kafka, cutting mean time to repair by 30%.
+
+I'd welcome a call to discuss how I could help your team.
+
+Kind regards,
+Alex Morgan"""
+
+
+def test_letter_task(client, fake):
+    rec = fake(ok_chat(LETTER))
+    cv = json.loads(json.dumps(SAMPLE))
+    cv["target"]["recipient"] = "Hiring Team\nContoso Networks"
+    r = client.post("/api/ai/generate", json={"provider": {"type": "openai", "apiKey": "k", "model": "m"}, "task": "letter", "cv": cv})
+    assert r.status_code == 200, r.text
+    text = r.json()["text"]
+    assert text.startswith("Dear Hiring Manager,") and text.endswith("Kind regards,\nAlex Morgan")
+    assert "enjoy most" in text  # the hard-wrapped line is rejoined
+    assert len(text.split("\n\n")) == 5
+    msgs = json.loads(rec.requests[0].content)["messages"]
+    assert "Three short paragraphs" in msgs[0]["content"] and "Never invent" in msgs[0]["content"]
+    assert "Recipient:\nHiring Team\nContoso Networks" in msgs[1]["content"]
+
+
+def test_letter_needs_a_target_job(client, fake):
+    rec = fake(ok_chat(LETTER))
+    cv = json.loads(json.dumps(SAMPLE))
+    cv["target"] = {"role": "", "jobDescription": ""}
+    r = client.post("/api/ai/generate", json={"provider": {"type": "openai", "apiKey": "k", "model": "m"}, "task": "letter", "cv": cv})
+    assert r.status_code == 400 and "target role" in r.json()["detail"] and not rec.requests
+
+
+def test_linkedin_task(client, fake):
+    long_headline = "Senior Network Engineer | FTTH and GPON access networks | Network automation with Python | " * 4
+    about = "I keep fibre networks running and automate the repetitive parts.\n\nAt Northwind Fibre I cut repair time by 30%."
+    rec = fake(ok_chat(json.dumps({"headline": long_headline, "about": about})))
+    r = gen(client, {"type": "openai", "apiKey": "k", "model": "m"}, task="linkedin")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert len(data["headline"]) <= 220 and data["headline"].startswith("Senior Network Engineer |")
+    assert not data["headline"].endswith("|")  # cut at a separator, not mid-word
+    assert data["about"] == about
+    assert '"See more"' in json.loads(rec.requests[0].content)["messages"][0]["content"]

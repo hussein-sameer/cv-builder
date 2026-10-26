@@ -54,5 +54,7 @@ export function useAI() {
     bullets: (o: GenerateOptions) => run('bullets', o),
     tailor: (o?: Partial<GenerateOptions>) => run('tailor', o),
     skills: (o?: Partial<GenerateOptions>) => run('skills', o),
+    letter: (o?: Partial<GenerateOptions>) => run('letter', o),
+    linkedin: (o?: Partial<GenerateOptions>) => run('linkedin', o),
   }
 }

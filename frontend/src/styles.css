@@ -340,6 +340,14 @@ select.input { padding-right: 4px; }
 .report-notes { padding-left: 18px; }
 .job-report mark { background: var(--mark-bg); color: var(--mark-ink); border-radius: 3px; padding: 0 2px; }
 .report-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.target-card .card-body > p.muted { margin: -4px 0 0; line-height: 1.45; }
+
+/* cover letter and LinkedIn modals */
+.ai-bar .grow { flex: 1; min-width: 200px; }
+.letter-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: -6px; }
+.checklist { border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; background: var(--panel-2); font-size: 13px; }
+.checklist summary { cursor: pointer; font-weight: 600; color: var(--ink-2); }
+.checklist ul { margin: 8px 0 2px; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; line-height: 1.45; }
 
 /* ------------------------------------------------------------- add section */
 .add-section { display: flex; flex-direction: column; gap: 10px; }

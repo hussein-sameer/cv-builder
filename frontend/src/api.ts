@@ -101,8 +101,9 @@ export const api = {
     return { data: await res.arrayBuffer(), pages: Number(res.headers.get('X-Page-Count') ?? 0) }
   },
 
-  async download(cv: CV, format: 'pdf' | 'docx', filename: string): Promise<void> {
-    const res = await post(`/api/export/${format}`, cv)
+  /** what: the CV itself, or its cover letter (target.coverLetter) with the same header */
+  async download(cv: CV, format: 'pdf' | 'docx', filename: string, what: 'cv' | 'letter' = 'cv'): Promise<void> {
+    const res = await post(`/api/export/${what === 'letter' ? 'letter/' : ''}${format}`, cv)
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -136,7 +137,7 @@ function filePart(text: string, limit = 60): string {
  * "Alex_Morgan_Network_Engineer_CV.pdf": the name and target role recruiters expect. The role is the Target job's
  * role, else the headline up to its first separator. Mirrors backend layout.file_stem.
  */
-export function fileName(cv: CV, ext: string): string {
+export function fileName(cv: CV, ext: string, suffix = 'CV'): string {
   const role = (cv.target.role.trim() || cv.personal.headline.trim()).split(ROLE_CUT)[0]
-  return [filePart(cv.personal.fullName), filePart(role), 'CV'].filter(Boolean).join('_') + '.' + ext
+  return [filePart(cv.personal.fullName), filePart(role), suffix].filter(Boolean).join('_') + '.' + ext
 }

@@ -36,7 +36,7 @@ class KeyRequest(BaseModel):
 
 class GenerateRequest(BaseModel):
     provider: ProviderConfig
-    task: Literal["summary", "bullets", "tailor", "skills"]
+    task: Literal["summary", "bullets", "tailor", "skills", "letter", "linkedin"]
     cv: CV
     options: prompts.GenerateOptions = prompts.GenerateOptions()
 
@@ -46,6 +46,8 @@ PROMPTS = {
     "bullets": prompts.bullets_prompts,
     "tailor": prompts.tailor_prompts,
     "skills": prompts.skills_prompts,
+    "letter": prompts.letter_prompts,
+    "linkedin": prompts.linkedin_prompts,
 }
 
 
@@ -61,9 +63,16 @@ def _result(task: str, raw: str, cv: CV) -> dict:
         if not bullets:
             raise AIError("The model returned no bullet points. Try again or pick another model.")
         return {"bullets": bullets}
+    if task == "letter":
+        text = prompts.clean_letter(raw)
+        if not text:
+            raise AIError("The model returned an empty letter. Try again or pick another model.")
+        return {"text": text}
     try:
         if task == "tailor":
             return {"report": prompts.parse_report(raw).model_dump()}
+        if task == "linkedin":
+            return prompts.parse_linkedin(raw)
         groups, dropped = prompts.parse_skills(raw, cv)
         return {"groups": groups, "dropped": dropped}
     except ValueError as e:

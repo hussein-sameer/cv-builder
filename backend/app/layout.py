@@ -12,7 +12,7 @@ from __future__ import annotations
 import base64
 import io
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from functools import lru_cache
 from typing import Literal
@@ -22,6 +22,8 @@ from PIL import Image, ImageOps
 from .models import CV, Item, Section
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+FULL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+               "November", "December"]
 
 
 # --------------------------------------------------------------------------- #
@@ -154,9 +156,10 @@ class Line:
 
 @dataclass
 class Block:
-    heading: str
+    heading: str  # "" = no heading (the cover letter's body)
     kind: Literal["paragraphs", "entries", "pairs", "lines"]
-    paragraphs: list[str] = field(default_factory=list)
+    paragraphs: list[str] = field(default_factory=list)  # a "\n" inside one is a line break
+    gap: float = 3  # points between paragraphs
     entries: list[Entry] = field(default_factory=list)
     pairs: list[tuple[str, str]] = field(default_factory=list)
     lines: list[Line] = field(default_factory=list)
@@ -175,6 +178,8 @@ class RenderDoc:
     accent: str
     page_size: str
     photo: bytes | None = None  # normalised JPEG, PHOTO_PX, or None
+    doc_title: str = "CV"  # file metadata: "<name> – CV"
+    subject: str = "Curriculum Vitae"
 
 
 # --------------------------------------------------------------------------- #
@@ -421,14 +426,44 @@ def _file_part(text: str, limit: int = 60) -> str:
     return part if len(part) <= limit else part[:limit].rsplit("_", 1)[0]
 
 
-def file_stem(cv: CV) -> str:
+def file_stem(cv: CV, suffix: str = "CV") -> str:
     """'Alex_Morgan_Network_Engineer_CV': the name and target role recruiters expect in the file name.
 
     The role is the Target job's role, else the headline up to its first separator ("Senior Engineer | Python"
     gives "Senior_Engineer"). Mirrors frontend api.fileName.
     """
     role = _ROLE_CUT_RE.split(cv.target.role.strip() or cv.personal.headline.strip(), maxsplit=1)[0]
-    return "_".join([x for x in (_file_part(cv.personal.fullName), _file_part(role)) if x] + ["CV"])
+    return "_".join([x for x in (_file_part(cv.personal.fullName), _file_part(role)) if x] + [suffix])
+
+
+def format_letter_date(d: date) -> str:
+    """'26 October 2026': unambiguous in every market (no 10/26 vs 26/10)."""
+    return f"{d.day} {FULL_MONTHS[d.month - 1]} {d.year}"
+
+
+def build_letter(cv: CV, today: date | None = None) -> RenderDoc:
+    """The cover letter: the CV's header (name, target title, contacts), the date, the recipient, then the text.
+
+    Same IR and renderers as the CV, so the letter matches it and stays ATS-safe. No photo or personal details.
+    Line breaks typed in the letter (an address, a sign-off) are kept.
+    """
+    doc = build_document(cv)
+
+    def lines(text: str) -> str:
+        return "\n".join(_clean(x) for x in text.replace("\r", "").split("\n") if x.strip())
+
+    body = [lines(p) for p in re.split(r"\n\s*\n", cv.target.coverLetter.replace("\r", "")) if p.strip()]
+    recipient = lines(cv.target.recipient)
+    paragraphs = [format_letter_date(today or date.today()), *([recipient] if recipient else []), *body]
+    return replace(
+        doc,
+        headline=_clean(cv.target.role) or doc.headline,
+        details=[],
+        photo=None,
+        blocks=[Block("", "paragraphs", paragraphs=paragraphs, gap=doc.font_size * 0.9)],
+        doc_title="Cover letter",
+        subject="Cover letter",
+    )
 
 
 def years_of_experience(cv: CV, today: date | None = None) -> float | None:

@@ -3,8 +3,10 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import { atsCheck, pageLimit } from './atsCheck'
 import { AiSettingsModal } from './components/AiSettingsModal'
 import { AtsPanel } from './components/AtsPanel'
+import { CoverLetterModal } from './components/CoverLetterModal'
 import { AddSection, PersonalCard, TargetCard } from './components/EditorCards'
 import { ImportCvModal } from './components/ImportCvModal'
+import { LinkedInModal } from './components/LinkedInModal'
 import { SectionCard } from './components/SectionCard'
 import { TopBar } from './components/TopBar'
 import { Tour } from './components/Tour'
@@ -142,6 +144,8 @@ function Shell() {
 
       <AiSettingsModal />
       <ImportCvModal />
+      <CoverLetterModal />
+      <LinkedInModal />
       <Tour />
 
       <div className="toasts" aria-live="polite">

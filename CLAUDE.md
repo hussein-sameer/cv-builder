@@ -90,7 +90,7 @@ frontend/src/
   components/          TopBar, CvSwitcher, AccountMenu, EditorCards (personal/target/add-section), SectionCard,
                        ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange), PhoneInput,
                        AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), Tour (guided tour), PdfPreview, AtsPanel,
-                       JobReport (the Target job card's recruiter check),
+                       JobReport (the Target job card's recruiter check), CoverLetterModal, LinkedInModal (not saved),
                        ui (Modal, Popover, ConfirmDelete, Spinner)
 ```
 
@@ -101,14 +101,18 @@ frontend/src/
 Items are *generic*: one `Item` shape (`title, organization, location, startDate, endDate, current,
 date, description, bullets[], tags[], grade, link, level`) whose meaning depends on the section type.
 This is what makes "add any section on demand" cheap. Dates are `"YYYY"` or `"YYYY-MM"`.
-`target` (role + job description, plus the last AI job match `report`) feeds the AI and is never printed.
+`target` (role + job description, plus the last AI job match `report`) feeds the AI and is never printed on the CV;
+`target.coverLetter` and `target.recipient` are printed only by the cover letter export.
 The report is saved with the CV; `parseCvText` drops it on import (it's re-run, not trusted from a file).
 
 **Rendering pipeline.** `layout.build_document(cv)` turns the CV into a `RenderDoc` IR made of blocks
 (`paragraphs | entries | pairs | lines`). `render_docx` and `render_pdf` only know how to draw the IR,
 so both formats always contain the same content in the same order. Section *kinds* live in
 `layout.SECTION_KIND`; template differences (headings, date style, entry order, personal-details block)
-live in `layout.TEMPLATES`.
+live in `layout.TEMPLATES`. The cover letter goes through the same IR: `layout.build_letter(cv)` reuses the CV's
+header (name, target role, contacts; no photo or personal details) with one headingless `paragraphs` block (date,
+recipient, letter). A block with an empty heading draws none, and a `\n` inside a paragraph is a line break in both
+renderers (CV paragraphs never contain one: `_paragraphs` joins lines).
 
 **Live preview** is the real PDF: the frontend POSTs the CV to `/api/export/pdf?inline=true`
 (debounced 450 ms), and draws it with pdf.js into canvases that are swapped in at once. The
@@ -140,7 +144,9 @@ endpoint (never auto-point a user at a custom URL).
 Shared-key generations are counted in `ai_usage` per user per UTC day (`AI_DAILY_LIMIT`).
 Prompts follow a recruiter brief: use only facts in the CV, no buzzwords, no invented metrics; missing
 numbers become `[X%]`-style placeholders that the ATS check flags.
-Generate tasks: `summary`, `bullets`, `tailor` (job match report as JSON: keywords with the posting's exact
+Generate tasks: `summary`, `bullets`, `letter` (needs a target role or job description; company facts it
+can't find become `[placeholders]`), `linkedin` (JSON `{headline, about}` cut to LinkedIn's 220 / 2,600 limits),
+`tailor` (job match report as JSON: keywords with the posting's exact
 wording marked must/nice, requirements with evidence, strengths, gaps, questions, next steps, estimate) and
 `skills` (regrouped skills; `parse_skills` drops any skill not found in the CV's own text and returns it as
 `dropped`, so "only skills you have" is enforced in code, not just asked for). JSON replies go through
@@ -293,5 +299,4 @@ test in `tests/test_ai.py`.
 - Login/sign-up throttles are in-memory, so they reset on restart and assume one instance.
 - No frontend unit or E2E tests in the repo yet (Playwright would fit).
 - Northflank doesn't publish the free sandbox's RAM; the app uses roughly 140 MB.
-- Possible next features: cover-letter generator, job-description keyword match score, per-section AI
-  rewrite, Google sign-in, admin page for users, scheduled DB backups.
+- Possible next features: per-section AI rewrite, Google sign-in, admin page for users, scheduled DB backups.

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Crosshair, Gauge, Globe, ImageUp, Plus, Trash2, UserRound } from 'lucide-react'
+import { ChevronDown, ChevronRight, Crosshair, Gauge, Globe, IdCard, ImageUp, Mail, Plus, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { jobKey, keywordMatch, PROFILE_EXAMPLE, siteOnly } from '../atsCheck'
 import { newSection } from '../defaults'
@@ -153,7 +153,7 @@ function PhotoField() {
 }
 
 export function TargetCard() {
-  const { cv, mutate } = useStore()
+  const { cv, mutate, openLetter, openLinkedin } = useStore()
   const ai = useAI()
   const [open, setOpen] = useState(!!(cv.target.role || cv.target.jobDescription))
   const ref = useRef<HTMLElement>(null)
@@ -178,7 +178,7 @@ export function TargetCard() {
   }, [])
 
   return (
-    <section className="card target-card" id="section-target" ref={ref}>
+    <section className="card target-card" id="section-target" ref={ref} data-tour="target">
       <header className="card-head clickable" onClick={() => setOpen(!open)}>
         <button type="button" className="icon-btn" aria-label={open ? 'Collapse' : 'Expand'}>
           {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
@@ -206,8 +206,14 @@ export function TargetCard() {
             <button type="button" className="btn ai" onClick={check} disabled={ai.busy || !cv.target.jobDescription.trim()} title={cv.target.jobDescription.trim() ? undefined : 'Paste the job description first'}>
               {ai.busy ? <Spinner /> : <Gauge size={15} />} {report ? 'Check again' : 'Check my fit with AI'}
             </button>
-            <span className="muted small">Keyword match, must-haves vs nice-to-haves, gaps and what to confirm: a recruiter's first read.</span>
+            <button type="button" className="btn sm" onClick={() => openLetter(true)}>
+              <Mail size={14} /> Cover letter{cv.target.coverLetter.trim() ? '' : '…'}
+            </button>
+            <button type="button" className="btn sm" onClick={() => openLinkedin(true)}>
+              <IdCard size={14} /> LinkedIn
+            </button>
           </div>
+          <p className="muted small">The fit check gives a keyword match, must-haves vs nice-to-haves, gaps and what to confirm: a recruiter's first read.</p>
           <JobReportView cv={cv} onClear={() => mutate((d) => void (d.target.report = null))} />
         </div>
       )}

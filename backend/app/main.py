@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 from urllib.parse import quote, urlparse
 
 from fastapi import Depends, FastAPI, Request
@@ -19,7 +20,7 @@ from .config import settings
 from .cvs_router import router as cvs_router
 from .db import close_db, get_db
 from .fonts import font_report
-from .layout import TEMPLATES, build_document, file_stem
+from .layout import TEMPLATES, build_document, build_letter, file_stem
 from .models import CV
 from .render_docx import render_docx
 from .render_pdf import render_pdf
@@ -114,6 +115,19 @@ def export_pdf(cv: CV, inline: bool = False, _: User = Depends(current_user)):
     if not inline:
         headers.update(_attachment(file_stem(cv) + ".pdf"))
     return Response(data, media_type="application/pdf", headers=headers)
+
+
+@app.post("/api/export/letter/{fmt}")
+def export_letter(fmt: Literal["pdf", "docx"], cv: CV, _: User = Depends(current_user)):
+    """The cover letter (target.coverLetter) with the CV's header, as a matching PDF or DOCX."""
+    if not cv.target.coverLetter.strip():
+        return JSONResponse({"detail": "Write or generate your cover letter first."}, status_code=400)
+    doc = build_letter(cv)
+    name = f"{file_stem(cv, 'Cover_Letter')}.{fmt}"
+    if fmt == "pdf":
+        data, _pages = render_pdf(doc)
+        return Response(data, media_type="application/pdf", headers=_attachment(name))
+    return Response(render_docx(doc), media_type=DOCX_MIME, headers=_attachment(name))
 
 
 # ----------------------------------------------------------------------------- #

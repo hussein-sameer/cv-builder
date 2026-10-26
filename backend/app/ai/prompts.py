@@ -269,6 +269,65 @@ def mentions(text: str, term: str) -> bool:
 
 
 # --------------------------------------------------------------------------- #
+# Cover letter
+# --------------------------------------------------------------------------- #
+def letter_prompts(cv: CV, o: GenerateOptions) -> tuple[str, str]:
+    if not (cv.target.role.strip() or cv.target.jobDescription.strip()):
+        raise ValueError("Add the target role or job description first, so the letter is about a real job.")
+    name = cv.personal.fullName.strip() or "the candidate's name"
+    system = f"""You are a senior recruiter and career coach for the {_market(cv)} job market.
+Write a cover letter for the candidate's application to the target job.
+
+Rules:
+- Use ONLY facts in the CV and the job description. Never invent employers, years, metrics, tools, certifications, achievements or facts about the company.
+- Three short paragraphs, about 250–350 words in total:
+  1. Motivation and hook: why this role at this company. Link the candidate's drive to what the job description says about the company (its mission, work, a recent achievement or its culture). If it says nothing about the company, write a clearly marked placeholder such as [what draws you to the company] for the candidate to fill in.
+  2. Value fit and proof: the experience that best matches the role's main requirements, with 1–2 results from the CV. Where a number would help but the CV has none, use a placeholder such as [X%]. Don't repeat the CV line by line.
+  3. Call to action: restate interest and invite a call or interview.
+- Mention relocation or work permit only if the CV states it and it matters for this job.
+- Open with "Dear <name>," if the recipient names a person, otherwise "Dear Hiring Manager,". Close with "Kind regards," and {name} on the next line.
+- Don't write a letter header (contact details, date, address): the app adds it.
+- First person, plain and specific, like an experienced professional wrote it, not an AI. Tone: {o.tone}. Avoid buzzwords and clichés such as: {BANNED}.
+- Write in {o.language}.
+- Output ONLY the letter: paragraphs separated by a blank line, no markdown, no commentary."""
+    user = "CV data:\n" + cv_to_text(cv) + "\n\n" + _target_text(cv)
+    if cv.target.recipient.strip():
+        user += f"\n\nRecipient:\n{cv.target.recipient.strip()}"
+    if cv.target.coverLetter.strip():
+        user += f"\n\nCurrent draft (improve on it, keep any true facts it adds):\n{cv.target.coverLetter.strip()}"
+    if o.instructions.strip():
+        user += f"\n\nExtra instructions from the candidate:\n{o.instructions.strip()}"
+    return system, user
+
+
+# --------------------------------------------------------------------------- #
+# LinkedIn headline and About
+# --------------------------------------------------------------------------- #
+HEADLINE_MAX, ABOUT_MAX = 220, 2600  # LinkedIn's limits
+
+
+def linkedin_prompts(cv: CV, o: GenerateOptions) -> tuple[str, str]:
+    system = f"""You are a senior recruiter who sources candidates on LinkedIn for the {_market(cv)} job market.
+Write the candidate's LinkedIn headline and About section from their CV{", aimed at the target job" if _target_text(cv) else ""}.
+
+Rules:
+- Use ONLY facts in the CV. Never invent employers, years, metrics, tools, certifications or achievements.
+- Headline (at most {HEADLINE_MAX} characters): job title + specialisation + top skills + location, with 3–5 keywords recruiters search for, separated by " | ". Use a standard, recognisable job title. Add relocation readiness if the CV states it.
+- About (1,200–2,000 characters, never more than {ABOUT_MAX}): first person. Put the core keywords and who the candidate is in the first 2–3 lines, before LinkedIn's "See more" fold. Then: the problem they solve and their expertise, 2–3 achievements with the CV's numbers (a placeholder such as [X%] where a number would help but the CV has none), and what they are looking for with a call to action. Short paragraphs separated by a blank line.
+- Work in 3–5 keywords naturally; no keyword lists. No vague lines such as "motivated professional looking for a challenging role". Avoid buzzwords such as: {BANNED}.
+- Tone: {o.tone}. Write in {o.language}.
+- Output ONLY one JSON object, no markdown and no commentary:
+{{"headline": "", "about": ""}}"""
+    user = "CV data:\n" + cv_to_text(cv)
+    tgt = _target_text(cv)
+    if tgt:
+        user += "\n\n" + tgt
+    if o.instructions.strip():
+        user += f"\n\nExtra instructions from the candidate:\n{o.instructions.strip()}"
+    return system, user
+
+
+# --------------------------------------------------------------------------- #
 # Output cleaning
 # --------------------------------------------------------------------------- #
 _THINK = re.compile(r"<think>.*?</think>", re.S | re.I)
@@ -410,3 +469,51 @@ def parse_skills(text: str, cv: CV) -> tuple[list[dict], list[str]]:
     if not groups:
         raise ValueError("no skill groups in the reply")
     return groups[:8], dropped[:20]
+
+
+def _prose(text: str) -> str:
+    """Paragraphs separated by one blank line, markdown removed, hard-wrapped lines rejoined.
+
+    A line break is kept after punctuation or a short line, so a sign-off ("Kind regards,\\nAlex") or an
+    address stays on its own lines while a paragraph the model wrapped at ~80 characters becomes one.
+    """
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"^#+\s*", "", text, flags=re.M)
+    paras = []
+    for p in re.split(r"\n\s*\n", text.replace("\r", "").strip().strip('"“”').strip()):
+        lines = [ln.strip() for ln in p.split("\n") if ln.strip()]
+        out = lines[:1]
+        for ln in lines[1:]:
+            last = out[-1].rsplit("\n", 1)[-1]
+            out[-1] += (" " if len(last) > 60 and not re.search(r"[.,:;!?]$", last) else "\n") + ln
+        if out:
+            paras.append(out[0])
+    return "\n\n".join(paras)
+
+
+def clean_letter(text: str) -> str:
+    text = _strip_common(text)
+    text = re.sub(r"^\s*(?:\*\*)?cover letter(?:\*\*)?:?\s*\n", "", text, flags=re.I)
+    return _prose(text)
+
+
+def _fit(text: str, limit: int) -> str:
+    """Cut to the limit at a separator or sentence end rather than mid-word."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    for sep in ("\n\n", ". ", " | ", " · ", ", ", " "):
+        i = cut.rfind(sep)
+        if i > limit * 0.6:
+            return cut[: i + (1 if sep == ". " else 0)].rstrip(" |·,")
+    return cut
+
+
+def parse_linkedin(text: str) -> dict:
+    """{"headline", "about"} within LinkedIn's limits. ValueError if the reply has neither."""
+    data = parse_json_object(text)
+    headline = _fit(_line(data.get("headline"), 1000).strip(" |"), HEADLINE_MAX)
+    about = _fit(_prose(str(data.get("about") or "")), ABOUT_MAX)
+    if not headline and not about:
+        raise ValueError("no headline or About text in the reply")
+    return {"headline": headline, "about": about}

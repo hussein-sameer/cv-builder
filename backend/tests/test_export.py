@@ -207,3 +207,59 @@ def test_profile_links_point_at_the_profile():
     data["personal"].update(linkedin="linkedin.com", github="alexmorgan", website="")
     urls = [c.url for c in build_document(CV.model_validate(data)).contacts if c.url.startswith("https://")]
     assert urls == ["https://github.com/alexmorgan"]
+
+
+LETTER = "Dear Hiring Manager,\n\nI'm applying for the Network Automation Engineer role.\n\nI'd welcome a call.\n\nKind regards,\nAlex Morgan"
+
+
+def _letter_cv(template="international") -> dict:
+    data = _cv(template)
+    data["personal"]["photo"] = _photo()
+    data["target"].update(coverLetter=LETTER, recipient="Hiring Team\nContoso Networks\n1 Example Street, Leeds")
+    return data
+
+
+def test_letter_layout():
+    from datetime import date
+
+    from app.layout import build_letter
+
+    doc = build_letter(CV.model_validate(_letter_cv("europass")), today=date(2026, 10, 26))
+    assert doc.headline == "Network Automation Engineer" and doc.photo is None and doc.details == []
+    assert [b.heading for b in doc.blocks] == [""]
+    paras = doc.blocks[0].paragraphs
+    assert paras[:2] == ["26 October 2026", "Hiring Team\nContoso Networks\n1 Example Street, Leeds"]
+    assert paras[-1] == "Kind regards,\nAlex Morgan"
+
+
+@pytest.mark.parametrize("template", ["international", "europass"])
+def test_letter_exports(client, template):
+    data = _letter_cv(template)
+    r = client.post("/api/export/letter/pdf", json=data)
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert "Alex_Morgan_Network_Automation_Engineer_Cover_Letter.pdf" in r.headers["content-disposition"]
+    pdf = PdfReader(io.BytesIO(r.content))
+    text = pdf.pages[0].extract_text()
+    assert pdf.metadata.title == "Alex Morgan – Cover letter" and not pdf.pages[0].images  # no photo on the letter
+    for needle in ("Alex Morgan", "alex.morgan@example.com", "Contoso Networks", "Dear Hiring Manager,", "I'd welcome a call."):
+        assert needle in text
+    assert text.index("Contoso Networks") < text.index("Dear Hiring Manager") < text.index("Kind regards")
+    assert "Nationality" not in text and "Northwind Fibre" not in text  # the letter only, not the CV
+
+    r = client.post("/api/export/letter/docx", json=data)
+    assert r.status_code == 200 and "Cover_Letter.docx" in r.headers["content-disposition"]
+    doc = Document(io.BytesIO(r.content))
+    assert len(doc.tables) == 0 and not [p for p in doc.paragraphs if p.style.name == "Heading 1"]
+    body = [p.text for p in doc.paragraphs]
+    assert "Hiring Team\nContoso Networks\n1 Example Street, Leeds" in body and "Kind regards,\nAlex Morgan" in body
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        assert "<w:drawing" not in z.read("word/document.xml").decode()
+
+
+def test_letter_export_errors(client):
+    assert client.post("/api/export/letter/pdf", json=_cv()).status_code == 400  # nothing written yet
+    assert client.post("/api/export/letter/odt", json=_letter_cv()).status_code == 422
+
+
+def test_letter_export_requires_login(anon):
+    assert anon.post("/api/export/letter/pdf", json=_letter_cv()).status_code == 401

@@ -100,6 +100,10 @@ export interface Target {
   role: string
   jobDescription: string
   report: JobReport | null
+  /** printed only by the cover letter export */
+  coverLetter: string
+  /** the letter's addressee: hiring team, company, address (one per line) */
+  recipient: string
 }
 
 export interface CV {
@@ -165,7 +169,7 @@ export interface TemplateInfo {
   headings: Record<string, string>
 }
 
-export type AiTask = 'summary' | 'bullets' | 'tailor' | 'skills'
+export type AiTask = 'summary' | 'bullets' | 'tailor' | 'skills' | 'letter' | 'linkedin'
 
 export interface SkillGroup {
   title: string
@@ -179,6 +183,8 @@ export interface AiResults {
   tailor: { report: JobReport }
   /** dropped: skills the model suggested that the CV doesn't show */
   skills: { groups: SkillGroup[]; dropped: string[] }
+  letter: { text: string }
+  linkedin: { headline: string; about: string }
 }
 export type AiResult<T extends AiTask> = AiResults[T] & { model: string; remaining: number | null }
 

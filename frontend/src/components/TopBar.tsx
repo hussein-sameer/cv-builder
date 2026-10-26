@@ -1,4 +1,4 @@
-import { Bot, Compass, FileDown, Monitor, Moon, Sun, FileJson, FileText, FileUp, MoreHorizontal, Palette, RotateCcw, Sparkle, Undo2, WandSparkles } from 'lucide-react'
+import { Bot, Compass, FileDown, IdCard, Mail, Monitor, Moon, Sun, FileJson, FileText, FileUp, MoreHorizontal, Palette, RotateCcw, Sparkle, Undo2, WandSparkles } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { api, fileName } from '../api'
 import { parseCvText } from '../cvImport'
@@ -29,7 +29,7 @@ const SIZES = [10, 10.5, 11, 11.5, 12] // the 10–12 pt recruiters expect
 const ACCENTS = ['#1F3864', '#000000', '#1D4E89', '#0F5257', '#7A1F2B', '#4B3F72']
 
 export function TopBar() {
-  const { cv, mutate, replaceCV, undo, canUndo, templates, ai, aiReady, aiConfig, openAISettings, openImport, openTour, importCV, toast, storageMode, createDoc } = useStore()
+  const { cv, mutate, replaceCV, undo, canUndo, templates, ai, aiReady, aiConfig, openAISettings, openImport, openLetter, openLinkedin, openTour, importCV, toast, storageMode, createDoc } = useStore()
   const [designOpen, setDesignOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [busy, setBusy] = useState<'pdf' | 'docx' | null>(null)
@@ -193,6 +193,27 @@ export function TopBar() {
             </button>
             <button type="button" className="menu-item" onClick={exportJSON}>
               <FileJson size={15} /> Export this CV as JSON
+            </button>
+            <hr />
+            <button
+              type="button"
+              className="menu-item"
+              onClick={() => {
+                setMenuOpen(false)
+                openLetter(true)
+              }}
+            >
+              <Mail size={15} /> Cover letter…
+            </button>
+            <button
+              type="button"
+              className="menu-item"
+              onClick={() => {
+                setMenuOpen(false)
+                openLinkedin(true)
+              }}
+            >
+              <IdCard size={15} /> LinkedIn headline and About…
             </button>
             <hr />
             <button

@@ -131,6 +131,8 @@ class Target(_Base):
     role: str = Field(default="", max_length=300)
     jobDescription: str = Field(default="", max_length=20000)
     report: JobReport | None = None
+    coverLetter: str = Field(default="", max_length=10000)  # printed only by the cover letter export
+    recipient: str = Field(default="", max_length=1000)  # the letter's addressee: hiring team, company, address
 
 
 class CV(_Base):
