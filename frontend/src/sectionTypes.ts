@@ -53,13 +53,13 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
   summary: {
     type: 'summary',
     label: 'Summary / Profile',
-    description: '3–5 lines on who you are and what you bring',
+    description: '4–6 sentences on who you are and what you bring',
     icon: Sparkles,
     kind: 'text',
     fields: [],
     addLabel: '',
     multiple: false,
-    tip: 'Keep it to 3–6 lines: your role, years of experience, top skills and 1–2 proven achievements. Use the AI button to draft it from the rest of your CV.',
+    tip: '4–6 sentences, no more than 6 lines: your role, years of experience, top skills, 1–2 proven achievements and, if it applies, relocation or visa status. Use the AI button to draft it from the rest of your CV.',
     textPlaceholder:
       'e.g. Network engineer with 6 years of experience running FTTH access networks. Cut mean time to repair by 30% by automating fault triage with Python…',
   },
@@ -72,7 +72,7 @@ export const SECTION_TYPES: Record<SectionType, SectionTypeDef> = {
     addLabel: 'position',
     multiple: false,
     aiBullets: true,
-    tip: 'Most recent first. Start bullets with an action verb and add numbers where you have them (team size, users, %, time saved).',
+    tip: 'Most recent first. 3–5 bullets per role, achievements before duties: start with an action verb and add numbers where you have them (team size, users, %, time saved).',
     fields: [
       { key: 'title', label: 'Job title', kind: 'text', placeholder: 'Senior Network Engineer' },
       { key: 'organization', label: 'Company', kind: 'text', placeholder: 'Acme Telecom' },
@@ -295,15 +295,5 @@ export const ADDABLE_ORDER: SectionType[] = [
   'customText',
 ]
 
-export const CEFR_LEVELS = [
-  'Native',
-  'C2 – Proficient',
-  'C1 – Advanced',
-  'B2 – Upper intermediate',
-  'B1 – Intermediate',
-  'A2 – Elementary',
-  'A1 – Beginner',
-  'Fluent',
-  'Professional working proficiency',
-  'Basic',
-]
+/** Suggestions for the level field: CEFR only, which EU employers screen on (the field still takes free text). */
+export const CEFR_LEVELS = ['Native', 'C2 – Proficient', 'C1 – Advanced', 'B2 – Upper intermediate', 'B1 – Intermediate', 'A2 – Elementary', 'A1 – Beginner']

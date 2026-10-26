@@ -25,6 +25,7 @@ function ThemeToggle() {
 }
 
 const FONTS = ['Calibri', 'Arial', 'Cambria', 'Times New Roman', 'Georgia']
+const SIZES = [10, 10.5, 11, 11.5, 12] // the 10–12 pt recruiters expect
 const ACCENTS = ['#1F3864', '#000000', '#1D4E89', '#0F5257', '#7A1F2B', '#4B3F72']
 
 export function TopBar() {
@@ -123,7 +124,7 @@ export function TopBar() {
             <label className="field">
               <span className="field-label">Font size</span>
               <select className="input" value={cv.design.fontSize} onChange={(e) => mutate((d) => void (d.design.fontSize = Number(e.target.value)))}>
-                {[9.5, 10, 10.5, 11, 11.5, 12].map((s) => (
+                {(SIZES.includes(cv.design.fontSize) ? SIZES : [cv.design.fontSize, ...SIZES].sort((a, b) => a - b)).map((s) => (
                   <option key={s} value={s}>
                     {s} pt
                   </option>

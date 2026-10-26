@@ -32,8 +32,8 @@ CV Builder is a multi-user web application for writing applicant-tracking-system
 - **Personal details** with a country-code phone picker, a date-of-birth calendar, a work permit / relocation line (printed in both layouts) and an optional photo, printed top right and cropped to passport proportions (28 × 36 mm).
 - **Sections on demand:** experience, education, skills, languages, certifications, projects, courses, volunteering, awards, publications, interests, references, and custom entry or free-text sections. Every section can be renamed, reordered, hidden or deleted.
 - **Two layouts:** *International* (title first, month-name dates, no personal details beyond the work permit line) and *EU / UK* (dates first, personal details block with nationality, work permit, date of birth and driving licence, CEFR language levels). Both are single column.
-- **Design options:** font (Calibri, Arial, Cambria, Times New Roman, Georgia), size, accent colour, A4 or Letter.
-- **ATS check:** flags missing contact details, missing dates, weak bullet openers, unfilled `[X%]` placeholders, emoji and page count, with links to the affected section.
+- **Design options:** font (Calibri, Arial, Cambria, Times New Roman, Georgia), size (10–12 pt), accent colour, A4 or Letter.
+- **ATS check:** flags missing contact details, missing dates, weak bullet openers and "I/my", unfilled `[X%]` placeholders, emoji, roles out of reverse-chronological order, more than 6 (or fewer than 3) bullets on recent roles, non-CEFR language levels, duplicate skills, a skill repeated so often it reads as keyword stuffing, a font size outside 10–12 pt and a photo, with links to the affected section. The page limit follows experience: one page up to 5 years (worked out from the dates), two pages above.
 - **Editing comforts:** undo (Ctrl+Z), collapse and expand all entries, light, dark and system themes, and a responsive layout down to phone width.
 - **Guided tour** for new accounts, replayable from the ⋯ menu.
 

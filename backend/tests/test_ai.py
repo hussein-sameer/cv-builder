@@ -88,6 +88,7 @@ def test_anthropic(client, fake):
     assert req.headers["x-api-key"] == "ak" and req.headers["anthropic-version"]
     body = json.loads(req.content)
     assert body["max_tokens"] > 0 and "recruiter" in body["system"]
+    assert "4–5 sentences" in body["system"]  # default length, inside the guide's 4–6
 
 
 def test_gemini(client, fake):

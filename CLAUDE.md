@@ -259,7 +259,7 @@ test in `tests/test_ai.py`.
 - **Photo is optional and off unless uploaded.** Stored in the CV JSON as a JPEG data URL (the editor
   crops it to 7:9 and shrinks it to ~50 KB in `photo.ts`; `layout.photo_jpeg` re-crops server-side so
   imported JSON prints alike). Expected in DACH, the Gulf and much of Asia; discouraged for UK/IE/US/CA
-  (the ATS check says so for the International layout).
+  (the ATS check says so in both layouts).
 - **Guided tour.** `components/Tour.tsx` highlights elements marked `data-tour="…"` (TopBar, CvSwitcher,
   App, EditorCards): keep those attributes when refactoring, and add one when a new feature deserves a step.
   "Seen" is per account: `users.tour_pending` is 1 for accounts created by sign-up or `manage create-user`
@@ -275,6 +275,8 @@ test in `tests/test_ai.py`.
 - **LinkedIn / GitHub links.** `layout.profile_url` turns a bare handle ("alexmorgan") into the profile URL and
   drops a value that only names the site ("LinkedIn", "github.com"), whose link would open the site's home page.
   `atsCheck.siteOnly` mirrors that check for the editor hint and the ATS warning: change both together.
+- **Mirrored helpers.** `atsCheck.yearsOfExperience` mirrors `layout.years_of_experience` (the page limit is one page
+  up to 5 years, two above) and `api.fileName` mirrors `layout.file_stem` (`Name_TargetRole_CV`): change both together.
 
 - No email-based password reset (admin CLI only); no email verification on sign-up.
 - Login/sign-up throttles are in-memory, so they reset on restart and assume one instance.

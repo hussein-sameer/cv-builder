@@ -23,9 +23,9 @@ BANNED = (
 )
 
 LENGTH = {
-    "short": "2–3 sentences, about 40–60 words",
-    "medium": "3–4 sentences, about 60–90 words",
-    "long": "4–5 sentences, about 90–120 words (never more than 6 lines)",
+    "short": "3–4 sentences, about 50–70 words",
+    "medium": "4–5 sentences, about 70–95 words",
+    "long": "5–6 sentences, about 90–120 words (never more than 6 lines)",
 }
 
 
