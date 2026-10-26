@@ -62,6 +62,9 @@ export function PersonalCard() {
           <Field label="Website (optional)">
             <TextInput value={p.website} onChange={set('website')} placeholder="yourname.dev" />
           </Field>
+          <Field label="Work permit / relocation (optional)" span={2} hint="Printed under your contact details in both layouts: visa status, right to work, relocation readiness.">
+            <TextInput value={p.workPermit} onChange={set('workPermit')} placeholder="e.g. Requires visa sponsorship · Open to relocation to Germany" />
+          </Field>
           <PhotoField />
         </div>
         <button type="button" className="disclosure" onClick={() => setShowEU(!showEU)} aria-expanded={showEU}>
@@ -71,9 +74,6 @@ export function PersonalCard() {
         </button>
         {showEU && (
           <div className="grid">
-            <Field label="Work permit / relocation" span={2}>
-              <TextInput value={p.workPermit} onChange={set('workPermit')} placeholder="e.g. Requires visa sponsorship · Open to relocation to Germany" />
-            </Field>
             <Field label="Nationality">
               <TextInput value={p.nationality} onChange={set('nationality')} placeholder="Iraqi" />
             </Field>

@@ -9,7 +9,7 @@ from docx import Document
 from PIL import Image
 from pypdf import PdfReader
 
-from app.layout import build_document, format_birth_date, format_date, profile_url, years_of_experience
+from app.layout import build_document, file_stem, format_birth_date, format_date, profile_url, years_of_experience
 from app.models import CV
 
 SAMPLE = json.loads((Path(__file__).parent / "sample_cv.json").read_text())
@@ -27,12 +27,13 @@ def test_pdf_is_text_based_and_complete(client, template):
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
     assert r.headers["x-page-count"] == "1"
-    assert "Alex_Morgan_CV.pdf" in r.headers["content-disposition"]
+    assert "Alex_Morgan_Network_Automation_Engineer_CV.pdf" in r.headers["content-disposition"]
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(r.content)).pages)
     for needle in ("Alex Morgan", "alex.morgan@example.com", "Northwind Fibre",
                    "cutting mean time to repair by 30%", "Python, Kafka", "German"):
         assert needle in text
     assert "Hidden section" not in text  # invisible sections are skipped
+    assert "Eligible to work in the UK and EU" in text  # work authorisation is printed in both layouts
     if template == "europass":
         assert "WORK EXPERIENCE" in text and "Nationality" in text and "03/2021" in text
     else:
@@ -155,6 +156,30 @@ def test_photo_is_normalised_and_bad_photos_are_handled(client):
     data["personal"]["photo"] = "data:image/jpeg;base64," + base64.b64encode(b"not an image").decode()
     r = client.post("/api/export/docx", json=data)  # undecodable: the CV still exports, without a photo
     assert r.status_code == 200 and b"word/media/" not in r.content
+
+
+def test_file_name_has_name_and_target_role():
+    def stem(name="Alex Morgan", role="", headline=""):
+        return file_stem(CV.model_validate({"personal": {"fullName": name, "headline": headline}, "target": {"role": role}}))
+
+    assert stem(role="Network Automation Engineer", headline="Senior Network Engineer") == "Alex_Morgan_Network_Automation_Engineer_CV"
+    # no target role: the headline, cut at its first separator
+    assert stem(headline="Senior Fiber Maintenance Engineer | Python, SQL | Baghdad") == "Alex_Morgan_Senior_Fiber_Maintenance_Engineer_CV"
+    assert stem(headline="Full-Stack Developer – React") == "Alex_Morgan_Full-Stack_Developer_CV"
+    assert stem() == "Alex_Morgan_CV"
+    assert stem(name="", role="DevOps Engineer") == "DevOps_Engineer_CV"
+    assert stem(name="Zoë Müller", role="C++ / Qt Developer") == "Zoë_Müller_C_Qt_Developer_CV"
+    long = stem(role="Principal " + "Very " * 20 + "Senior Engineer")
+    assert len(long) < 80 and long.endswith("_Very_CV")  # clipped on a word boundary
+
+
+def test_work_permit_only_detail_in_international_layout():
+    data = _cv()
+    doc = build_document(CV.model_validate(data))
+    assert doc.details == [("Work permit", "Eligible to work in the UK and EU")]
+    data["design"]["template"] = "europass"
+    labels = [k for k, _ in build_document(CV.model_validate(data)).details]
+    assert labels == ["Nationality", "Work permit", "Driving licence"]
 
 
 def test_birth_date_and_phone_code_only():

@@ -29,13 +29,15 @@ CV Builder is a multi-user web application for writing applicant-tracking-system
 
 ### Editor
 
-- **Personal details** with a country-code phone picker, a date-of-birth calendar and an optional photo, printed top right and cropped to passport proportions (28 × 36 mm).
+- **Personal details** with a country-code phone picker, a date-of-birth calendar, a work permit / relocation line (printed in both layouts) and an optional photo, printed top right and cropped to passport proportions (28 × 36 mm).
 - **Sections on demand:** experience, education, skills, languages, certifications, projects, courses, volunteering, awards, publications, interests, references, and custom entry or free-text sections. Every section can be renamed, reordered, hidden or deleted.
-- **Two layouts:** *International* (title first, month-name dates) and *EU / UK* (dates first, personal details block with nationality, work permit, date of birth and driving licence, CEFR language levels). Both are single column.
+- **Two layouts:** *International* (title first, month-name dates, no personal details beyond the work permit line) and *EU / UK* (dates first, personal details block with nationality, work permit, date of birth and driving licence, CEFR language levels). Both are single column.
 - **Design options:** font (Calibri, Arial, Cambria, Times New Roman, Georgia), size, accent colour, A4 or Letter.
 - **ATS check:** flags missing contact details, missing dates, weak bullet openers, unfilled `[X%]` placeholders, emoji and page count, with links to the affected section.
 - **Editing comforts:** undo (Ctrl+Z), collapse and expand all entries, light, dark and system themes, and a responsive layout down to phone width.
 - **Guided tour** for new accounts, replayable from the ⋯ menu.
+
+- **File names** follow the `FirstName_LastName_TargetRole_CV.pdf` convention, using the target role (or the headline up to its first `|`).
 
 ### Live preview
 

@@ -36,7 +36,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Start with your details',
-    body: 'Name, contact details and, for countries that expect one, a photo. The EU / UK extras (nationality, work permit, date of birth) are just below.',
+    body: 'Name, contact details and, for countries that expect one, a photo. The EU / UK extras (nationality, date of birth, driving licence) are just below.',
     targets: ['personal'],
   },
   {

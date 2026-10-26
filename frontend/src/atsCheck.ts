@@ -8,10 +8,11 @@ export interface Issue {
   sectionId?: string
 }
 
-const WEAK_STARTS = /^(responsible for|worked on|helped|assisted|duties included|tasked with|involved in|in charge of)\b/i
+const WEAK_STARTS = /^(responsible for|was responsible for|responsibilities included|worked on|helped|assisted|duties included|tasked with|involved in|in charge of|handled|participated in)\b/i
 const PLACEHOLDER = /\[[^\]]{0,25}\]/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PRONOUN = /(^|\s)(I|my|me)\s/
+// "I" only as a capital, so "i.e." doesn't count; "My"/"my" either way
+const PRONOUN = /(^|[\s(])(I|I['’](m|ve|d|ll)|[Mm]y|[Mm]e|[Mm]yself)(?=[\s,.;:!?)]|$)/
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length
 
@@ -81,7 +82,7 @@ export function atsCheck(cv: CV, pages: number | null): Issue[] {
         it.bullets.forEach((b) => {
           if (WEAK_STARTS.test(b.trim())) add('info', `“${b.trim().slice(0, 40)}…” — start with an action verb instead.`, s.id)
           if (words(b) > 40) add('info', `A bullet in “${label}” is over 40 words — split or tighten it.`, s.id)
-          if (PRONOUN.test(' ' + b)) add('info', `Avoid “I/my” in bullets (“${b.trim().slice(0, 30)}…”).`, s.id)
+          if (PRONOUN.test(b)) add('info', `Avoid “I/my” in bullets (“${b.trim().slice(0, 30)}…”).`, s.id)
         })
       }
     })

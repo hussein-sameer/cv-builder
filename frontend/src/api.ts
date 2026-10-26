@@ -130,7 +130,18 @@ export const api = {
   },
 }
 
+const ROLE_CUT = /\s+[|·•–—-]\s+|[|·•,(]/
+
+function filePart(text: string, limit = 60): string {
+  const part = text.replace(/[^\p{L}\p{N}_\- ]/gu, '').trim().replace(/\s+/g, '_')
+  return part.length <= limit ? part : part.slice(0, limit).replace(/_[^_]*$/, '')
+}
+
+/**
+ * "Alex_Morgan_Network_Engineer_CV.pdf": the name and target role recruiters expect. The role is the Target job's
+ * role, else the headline up to its first separator. Mirrors backend layout.file_stem.
+ */
 export function fileName(cv: CV, ext: string): string {
-  const name = cv.personal.fullName.trim().replace(/[^\p{L}\p{N}\- ]/gu, '').replace(/\s+/g, '_')
-  return `${name ? name + '_CV' : 'CV'}.${ext}`
+  const role = (cv.target.role.trim() || cv.personal.headline.trim()).split(ROLE_CUT)[0]
+  return [filePart(cv.personal.fullName), filePart(role), 'CV'].filter(Boolean).join('_') + '.' + ext
 }

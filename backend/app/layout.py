@@ -36,7 +36,7 @@ class TemplateSpec:
     date_style: Literal["month_name", "numeric"]
     present_word: str
     entry_style: Literal["title_first", "dates_first"]
-    show_personal_details: bool
+    personal_details: tuple[str, ...]  # Personal fields printed in the details line, in this order
     headings: dict[str, str]
 
 
@@ -57,13 +57,15 @@ TEMPLATES: dict[str, TemplateSpec] = {
     "international": TemplateSpec(
         key="international",
         name="International ATS",
-        description="Single column, standard headings, no personal details such as date of birth. "
+        description="Single column, standard headings, no personal details such as date of birth or nationality "
+        "(only your work permit / relocation line). "
         "Safest choice for applicant tracking systems in the US, Gulf and most global employers.",
         default_font="Calibri",
         date_style="month_name",
         present_word="Present",
         entry_style="title_first",
-        show_personal_details=False,
+        # work authorisation belongs in the header for every market; the rest is EU-only
+        personal_details=("workPermit",),
         headings={
             "summary": "Professional Summary",
             "experience": "Experience",
@@ -82,7 +84,7 @@ TEMPLATES: dict[str, TemplateSpec] = {
         date_style="numeric",
         present_word="Present",
         entry_style="dates_first",
-        show_personal_details=True,
+        personal_details=("nationality", "dateOfBirth", "workPermit", "drivingLicence"),
         headings={
             "summary": "Profile",
             "experience": "Work Experience",
@@ -114,6 +116,9 @@ SECTION_KIND: dict[str, str] = {
 }
 
 TAGS_LABEL = {"experience": "Tools", "projects": "Technologies", "volunteering": "Skills", "custom": "Keywords"}
+
+DETAIL_LABELS = {"nationality": "Nationality", "dateOfBirth": "Date of birth", "workPermit": "Work permit",
+                 "drivingLicence": "Driving licence"}
 
 
 # --------------------------------------------------------------------------- #
@@ -386,15 +391,10 @@ def build_document(cv: CV) -> RenderDoc:
             contacts.append(Link(_display_url(url), _href(url)))
 
     details: list[tuple[str, str]] = []
-    if spec.show_personal_details:
-        for label, value in (
-            ("Nationality", p.nationality),
-            ("Date of birth", format_birth_date(p.dateOfBirth)),
-            ("Work permit", p.workPermit),
-            ("Driving licence", p.drivingLicence),
-        ):
-            if value.strip():
-                details.append((label, _clean(value)))
+    for key in spec.personal_details:
+        value = format_birth_date(p.dateOfBirth) if key == "dateOfBirth" else getattr(p, key)
+        if value.strip():
+            details.append((DETAIL_LABELS[key], _clean(value)))
 
     blocks = [b for s in cv.sections if s.visible and (b := build_block(s, spec))]
 
@@ -413,10 +413,22 @@ def build_document(cv: CV) -> RenderDoc:
     )
 
 
+_ROLE_CUT_RE = re.compile(r"\s+[|·•–—-]\s+|[|·•,(]")
+
+
+def _file_part(text: str, limit: int = 60) -> str:
+    part = re.sub(r"\s+", "_", re.sub(r"[^\w\- ]", "", text, flags=re.UNICODE).strip())
+    return part if len(part) <= limit else part[:limit].rsplit("_", 1)[0]
+
+
 def file_stem(cv: CV) -> str:
-    name = re.sub(r"[^\w\- ]", "", cv.personal.fullName, flags=re.UNICODE).strip()
-    name = re.sub(r"\s+", "_", name)
-    return f"{name}_CV" if name else "CV"
+    """'Alex_Morgan_Network_Engineer_CV': the name and target role recruiters expect in the file name.
+
+    The role is the Target job's role, else the headline up to its first separator ("Senior Engineer | Python"
+    gives "Senior_Engineer"). Mirrors frontend api.fileName.
+    """
+    role = _ROLE_CUT_RE.split(cv.target.role.strip() or cv.personal.headline.strip(), maxsplit=1)[0]
+    return "_".join([x for x in (_file_part(cv.personal.fullName), _file_part(role)) if x] + ["CV"])
 
 
 def years_of_experience(cv: CV, today: date | None = None) -> float | None:
