@@ -113,6 +113,9 @@ live in `layout.TEMPLATES`. The cover letter goes through the same IR: `layout.b
 header (name, target role, contacts; no photo or personal details) with one headingless `paragraphs` block (date,
 recipient, letter). A block with an empty heading draws none, and a `\n` inside a paragraph is a line break in both
 renderers (CV paragraphs never contain one: `_paragraphs` joins lines).
+A section heading never ends a page: the DOCX gets this from `Heading 1`'s keep-with-next chaining into the
+entry's header paragraphs; the PDF puts heading, rule and the first entry's head (or first line) in one
+`KeepTogether`, because ReportLab's `keepWithNext` stops at the rule and never chains into a `KeepTogether`.
 
 **Live preview** is the real PDF: the frontend POSTs the CV to `/api/export/pdf?inline=true`
 (debounced 450 ms), and draws it with pdf.js into canvases that are swapped in at once. The

@@ -78,7 +78,8 @@ class _Styles:
         self.sub = ParagraphStyle("sub", parent=self.body, fontSize=fs * 0.95, leading=fs * 1.22, textColor=MUTED, leftIndent=8)
 
 
-def _entry_flowables(e: Entry, st: _Styles, width: float, dates_first: bool) -> list:
+def _entry_flowables(e: Entry, st: _Styles, width: float, dates_first: bool) -> tuple[list, list]:
+    """Return (head, rest): the head is the entry's header plus its first line of content."""
     out: list = []
     title_html = f"<b>{_e(e.title)}</b>" if e.title else ""
     org_loc = " – ".join(x for x in (_e(e.subtitle), _e(e.location)) if x)
@@ -125,9 +126,8 @@ def _entry_flowables(e: Entry, st: _Styles, width: float, dates_first: bool) -> 
     if e.tags:
         out.append(Paragraph(f"<b>{_e(e.tags_label)}:</b> {_e(e.tags)}", st.body))
     out.append(Spacer(1, st.body.fontSize * 0.55))
-    # keep the header with at least its first line of content
     head_len = min(len(out), 3)
-    return [KeepTogether(out[:head_len])] + out[head_len:]
+    return out[:head_len], out[head_len:]
 
 
 def _line_flowables(ln: Line, st: _Styles) -> list:
@@ -144,29 +144,33 @@ def _line_flowables(ln: Line, st: _Styles) -> list:
 
 
 def _block_flowables(b: Block, st: _Styles, width: float, dates_first: bool) -> list:
-    out: list = []
-    if b.heading:
-        out += [
-            Paragraph(f"<b>{_e(b.heading.upper())}</b>", st.heading),
-            HRFlowable(width="100%", thickness=0.6, color=st.heading.textColor, spaceBefore=1, spaceAfter=4),
-        ]
-    else:  # the cover letter's body: a line's gap below the header, like the DOCX's empty paragraph
-        out.append(Spacer(1, st.body.fontSize))
+    # (lead, rest) per paragraph, entry or line; a page never breaks inside a lead
+    parts: list[tuple[list, list]] = []
     if b.kind == "paragraphs":
-        for p in b.paragraphs:
-            out.append(Paragraph(_e(p).replace("\n", "<br/>"), st.body))
-            out.append(Spacer(1, b.gap))
+        parts = [([Paragraph(_e(p).replace("\n", "<br/>"), st.body)], [Spacer(1, b.gap)]) for p in b.paragraphs]
     elif b.kind == "entries":
-        for e in b.entries:
-            out.extend(_entry_flowables(e, st, width, dates_first))
+        parts = [_entry_flowables(e, st, width, dates_first) for e in b.entries]
     elif b.kind == "pairs":
         for label, value in b.pairs:
             html = f"<b>{_e(label)}:</b> {_e(value)}" if label and value else _e(label or value)
-            out.append(Paragraph(html, st.body))
-            out.append(Spacer(1, 1.5))
+            parts.append(([Paragraph(html, st.body)], [Spacer(1, 1.5)]))
     elif b.kind == "lines":
-        for ln in b.lines:
-            out.extend(_line_flowables(ln, st))
+        parts = [(fl[:1], fl[1:]) for fl in (_line_flowables(ln, st) for ln in b.lines)]
+
+    out: list = []
+    if b.heading:
+        heading = [
+            Paragraph(f"<b>{_e(b.heading.upper())}</b>", st.heading),
+            HRFlowable(width="100%", thickness=0.6, color=st.heading.textColor, spaceBefore=1, spaceAfter=4),
+        ]
+        # The heading joins its first part's lead, so it never ends a page alone. keepWithNext can't do
+        # this: ReportLab stops the chain at the rule, and never chains into a KeepTogether.
+        lead, rest = parts[0] if parts else ([], [])
+        parts[:1] = [(heading + lead, rest)]
+    else:  # the cover letter's body: a line's gap below the header, like the DOCX's empty paragraph
+        out.append(Spacer(1, st.body.fontSize))
+    for lead, rest in parts:
+        out += [KeepTogether(lead) if len(lead) > 1 else lead[0], *rest]
     return out
 
 
