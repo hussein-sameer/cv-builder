@@ -263,3 +263,22 @@ def test_letter_export_errors(client):
 
 def test_letter_export_requires_login(anon):
     assert anon.post("/api/export/letter/pdf", json=_letter_cv()).status_code == 401
+
+
+@pytest.mark.parametrize("template", ["international", "europass"])
+def test_pdf_never_ends_a_page_with_a_heading(template):
+    """Push the later sections down a line at a time: each heading must move to the next page with its content."""
+    from app.render_pdf import render_pdf
+
+    data = _cv(template)
+    first_job = next(s for s in data["sections"] if s["type"] == "experience")["items"][0]
+    bullets = first_job["bullets"]
+    headings = {b.heading.upper() for b in build_document(CV.model_validate(data)).blocks}
+    breaks = 0
+    for extra in range(45):
+        first_job["bullets"] = bullets + ["Kept the network documentation up to date."] * extra
+        pdf, pages = render_pdf(build_document(CV.model_validate(data)))
+        for page in PdfReader(io.BytesIO(pdf)).pages[:-1]:
+            breaks += 1
+            assert page.extract_text().strip().splitlines()[-1] not in headings
+    assert breaks > 30  # the page break really swept through the sections below Experience
