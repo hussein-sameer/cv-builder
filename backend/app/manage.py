@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> None:
                 sys.exit("Cancelled.")
             for sql in ("DELETE FROM cvs WHERE user_id = ?", "DELETE FROM sessions WHERE user_id = ?",
                         "DELETE FROM ai_usage WHERE user_id = ?", "DELETE FROM ai_keys WHERE user_id = ?",
-                        "DELETE FROM users WHERE id = ?"):
+                        "DELETE FROM photos WHERE user_id = ?", "DELETE FROM users WHERE id = ?"):
                 c.execute(sql, (row["id"],))
             print("Deleted", email)
 

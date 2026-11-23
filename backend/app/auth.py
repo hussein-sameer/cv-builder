@@ -348,6 +348,7 @@ def delete_account(body: DeleteBody, response: Response, user: User = Depends(cu
             "DELETE FROM sessions WHERE user_id = ?",
             "DELETE FROM ai_usage WHERE user_id = ?",
             "DELETE FROM ai_keys WHERE user_id = ?",
+            "DELETE FROM photos WHERE user_id = ?",
             "DELETE FROM users WHERE id = ?",
         ):
             c.execute(sql, (user.id,))

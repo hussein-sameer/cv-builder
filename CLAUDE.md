@@ -56,6 +56,7 @@ backend/app/
   db.py            SQLite or Postgres behind one tiny API (`get_db().tx()` -> Conn.execute/one/all); schema + migrations
   auth.py          Users, scrypt passwords, cookie sessions, throttling, /api/auth/* routes, `current_user` dependency
   storage.py       CV library CRUD, always scoped by user_id;  cvs_router.py = /api/cvs routes
+  photos.py        /api/photos: the user's saved photos (MAX_PHOTOS = 3), normalised to the printed 7:9 JPEG
   manage.py        Admin CLI (no email password reset exists)
   ai/providers.py  Raw-REST adapters: openai-compatible, anthropic, gemini, ollama; resolve() = key/base-URL policy + SSRF guard
   ai/keys.py       Per-user saved API keys: AES-256-GCM (SECRET_KEY or SQLite-side secret.key), bound to user+provider+base URL
@@ -89,6 +90,7 @@ frontend/src/
                        and bump the ?v= in index.html so browsers drop the cached icon
   components/          TopBar, CvSwitcher, AccountMenu, EditorCards (personal/target/add-section), SectionCard,
                        ItemCard (+RowItem), fields (inputs, BulletsEditor, TagInput, MonthYear, DateRange), PhoneInput,
+                       PhotoPicker (photo field: saved photos / No photo / upload, and the delete-to-make-room dialog),
                        AiSettingsModal, ImportCvModal (3-step upload-with-AI wizard), Tour (guided tour), PdfPreview, AtsPanel,
                        JobReport (the Target job card's recruiter check), CoverLetterModal, LinkedInModal (not saved),
                        ui (Modal, Popover, ConfirmDelete, Spinner)
@@ -159,7 +161,7 @@ CV on every render (must-haves count double), and `atsCheck.jobKey` marks a repo
 description changes. `atsCheck.countTerm` mirrors `prompts.mentions` (whole word, a trailing `+`/`#` is part of it).
 
 **Database.** `DATABASE_URL`, else `POSTGRES_URI` (Northflank addon), else SQLite at
-`DATA_DIR/cvs.db`. Tables: `users, sessions, cvs, ai_usage, ai_keys`. Schema is created idempotently on startup
+`DATA_DIR/cvs.db`. Tables: `users, sessions, cvs, ai_usage, ai_keys, photos`. Schema is created idempotently on startup
 in `db.SCHEMA`; columns added to existing tables later are listed in `db.ADDED_COLUMNS`. There is no
 migration framework.
 
@@ -278,7 +280,11 @@ test in `tests/test_ai.py`.
 
 - **Photo is optional and off unless uploaded.** Stored in the CV JSON as a JPEG data URL (the editor
   crops it to 7:9 and shrinks it to ~50 KB in `photo.ts`; `layout.photo_jpeg` re-crops server-side so
-  imported JSON prints alike). Expected in DACH, the Gulf and much of Asia; discouraged for UK/IE/US/CA
+  imported JSON prints alike). Uploads also go into the account's photo library (`photos` table, at most
+  `photos.MAX_PHOTOS`, mirrored as `PhotoPicker.MAX_PHOTOS`): the CV embeds a *copy* of the chosen photo, never
+  an id, so exports and JSON downloads need only the CV and deleting a saved photo never changes a CV. A full
+  library makes the upload ask which photos to delete; `POST /api/photos` takes `replaceIds` so that's one
+  transaction. In browser-only mode (`storageMode === 'local'`) there's no library and uploads go straight into the CV. Expected in DACH, the Gulf and much of Asia; discouraged for UK/IE/US/CA
   (the ATS check says so in both layouts).
 - **Guided tour.** `components/Tour.tsx` highlights elements marked `data-tour="…"` (TopBar, CvSwitcher,
   App, EditorCards): keep those attributes when refactoring, and add one when a new feature deserves a step.
@@ -288,6 +294,9 @@ test in `tests/test_ai.py`.
   With `AUTH_ENABLED=false` there's no account row, so the browser remembers it (`storage.tourState`).
   Replay: ⋯ → Show tutorial, or "Take the tour" on the welcome card. Steps whose target is hidden (e.g. the ATS check on a phone's
   Edit tab) are dropped when marked `optional`.
+- **Hidden work permit line.** `personal.showWorkPermit` (default true) keeps `workPermit` in the editor but
+  leaves it out of `layout.build_document` and `prompts.cv_to_text`, so neither the CV nor the AI uses it.
+  `AI_IMPORT_PROMPT` doesn't ask for it (an imported CV shows the line); `parseCvText` keeps a CV Builder export's value.
 - **Phone and date of birth.** `personal.phone` stays one string ("+964 770…"); `PhoneInput` splits it
   with the prefix-free calling codes in `countries.ts` and never preselects a country. `dateOfBirth` is
   ISO `YYYY-MM-DD` from a date picker, printed `DD/MM/YYYY` (`layout.format_birth_date`); older free-text

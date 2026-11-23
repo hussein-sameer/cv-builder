@@ -49,7 +49,7 @@ def cv_to_text(cv: CV, skip_summary: bool = False) -> str:
     out: list[str] = []
     for label, val in (
         ("Name", p.fullName), ("Headline", p.headline), ("Location", p.location),
-        ("Nationality", p.nationality), ("Work permit / relocation", p.workPermit),
+        ("Nationality", p.nationality), ("Work permit / relocation", p.workPermit if p.showWorkPermit else ""),
     ):
         if val.strip():
             out.append(f"{label}: {val.strip()}")

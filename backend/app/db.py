@@ -58,6 +58,14 @@ SCHEMA = [
         updated_at TEXT NOT NULL,
         UNIQUE (user_id, provider, base_url)
     )""",
+    # each user's saved CV photos (at most photos.MAX_PHOTOS); a CV embeds a copy of the one it uses
+    """CREATE TABLE IF NOT EXISTS photos (
+        id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL,
+        data       TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )""",
+    "CREATE INDEX IF NOT EXISTS photos_user_idx ON photos (user_id, created_at)",
 ]
 POST_SCHEMA = ["CREATE INDEX IF NOT EXISTS cvs_user_idx ON cvs (user_id, updated_at)"]
 # Columns added after tables already existed in deployed databases: (table, column, definition).

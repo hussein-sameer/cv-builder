@@ -182,6 +182,23 @@ def test_work_permit_only_detail_in_international_layout():
     assert labels == ["Nationality", "Work permit", "Driving licence"]
 
 
+@pytest.mark.parametrize("template", ["international", "europass"])
+def test_hidden_work_permit_is_kept_but_not_printed(client, template):
+    data = _cv(template)
+    data["personal"]["showWorkPermit"] = False
+    cv = CV.model_validate(data)
+    assert cv.personal.workPermit == "Eligible to work in the UK and EU"  # the text survives a save
+    assert all(label != "Work permit" for label, _ in build_document(cv).details)
+    pdf = PdfReader(io.BytesIO(client.post("/api/export/pdf", json=data).content))
+    assert "Eligible to work" not in "".join(page.extract_text() for page in pdf.pages)
+    docx = Document(io.BytesIO(client.post("/api/export/docx", json=data).content))
+    assert "Eligible to work" not in "\n".join(p.text for p in docx.paragraphs)
+    from app.ai.prompts import cv_to_text
+
+    assert "Work permit" not in cv_to_text(cv)  # the AI doesn't see what the CV doesn't print
+    assert "Work permit / relocation: Eligible" in cv_to_text(CV.model_validate(_cv(template)))
+
+
 def test_birth_date_and_phone_code_only():
     assert format_birth_date("1990-03-15") == "15/03/1990"
     assert format_birth_date("15 March 1990") == "15 March 1990"  # older free text kept as typed

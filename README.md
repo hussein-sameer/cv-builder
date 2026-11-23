@@ -29,7 +29,8 @@ CV Builder is a multi-user web application for writing applicant-tracking-system
 
 ### Editor
 
-- **Personal details** with a country-code phone picker, a date-of-birth calendar, a work permit / relocation line (printed in both layouts) and an optional photo, printed top right and cropped to passport proportions (28 × 36 mm).
+- **Personal details** with a country-code phone picker, a date-of-birth calendar, a work permit / relocation line (printed in both layouts; a *Show on this CV* switch leaves it off one CV without deleting the text, and the AI helper then ignores it too) and an optional photo, printed top right and cropped to passport proportions (28 × 36 mm).
+- **Saved photos:** up to 3 photos are kept in your account and shared by all your CVs. Each CV picks one of them or *No photo*. Uploading a 4th opens a dialog where you tick one or more saved photos to delete to make room (or use the new photo on that CV without saving it); *Manage photos* deletes them any time. A CV keeps a copy of its photo, so deleting a saved photo never changes a CV that already uses it.
 - **Sections on demand:** experience, education, skills, languages, certifications, projects, courses, volunteering, awards, publications, interests, references, and custom entry or free-text sections. Every section can be renamed, reordered, hidden or deleted.
 - **Two layouts:** *International* (title first, month-name dates, no personal details beyond the work permit line) and *EU / UK* (dates first, personal details block with nationality, work permit, date of birth and driving licence, CEFR language levels). Both are single column.
 - **Design options:** font (Calibri, Arial, Cambria, Times New Roman, Georgia), size (10–12 pt), accent colour, A4 or Letter.
@@ -250,6 +251,8 @@ Interactive OpenAPI documentation is served at `/docs`.
 | `POST` | `/api/auth/tour-done` | Mark the guided tour as finished for the account |
 | `GET` / `POST` | `/api/cvs` | List / create (`{name, data}`, or `{name, sourceId}` to duplicate) |
 | `GET` / `PUT` / `DELETE` | `/api/cvs/{id}` | Load / save (`{name?, data?}`) / delete |
+| `GET` / `POST` | `/api/photos` | List saved photos / save one (`{data, replaceIds?}`: deletes `replaceIds` first; `409` when 3 are already saved) |
+| `DELETE` | `/api/photos/{id}` | Delete a saved photo |
 | `GET` | `/api/ai/config` | Provider catalogue, whether a server key exists, whether keys can be saved |
 | `GET` / `PUT` | `/api/ai/keys` | List saved keys (provider, base URL, last four characters) / save one |
 | `DELETE` | `/api/ai/keys/{id}` | Remove a saved key |
@@ -266,7 +269,7 @@ cd frontend && npm run build                                             # type 
 
 The backend suite covers:
 - both renderers, with ATS-safety assertions on the DOCX structure and the PDF text layer;
-- photo handling;
+- photo handling and the saved-photo library (limit, replace, isolation between users);
 - all four AI adapters, against a mock HTTP transport with no network or keys;
 - shared-key limits, encrypted per-user keys and the SSRF guard;
 - accounts, sessions and throttling;

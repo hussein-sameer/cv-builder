@@ -20,6 +20,7 @@ from .config import settings
 from .cvs_router import router as cvs_router
 from .db import close_db, get_db
 from .fonts import font_report
+from .photos import router as photos_router
 from .layout import TEMPLATES, build_document, build_letter, file_stem
 from .models import CV
 from .render_docx import render_docx
@@ -75,6 +76,7 @@ async def guard(request: Request, call_next):
 app.include_router(auth_router)
 app.include_router(ai_router)
 app.include_router(cvs_router)
+app.include_router(photos_router)
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
