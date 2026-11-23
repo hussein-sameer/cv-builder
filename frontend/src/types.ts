@@ -55,6 +55,8 @@ export interface Personal {
   nationality: string
   dateOfBirth: string
   workPermit: string
+  /** false keeps the work permit text in the editor but leaves it off this CV (and out of AI prompts) */
+  showWorkPermit: boolean
   drivingLicence: string
   /** optional photo as a JPEG data URL ("" = none); printed top right in both layouts */
   photo: string
@@ -153,6 +155,14 @@ export interface AIConfig {
 }
 
 /** A key saved to the user's account. The key itself never comes back, only a hint. */
+/** A photo in the user's library (at most 3). A CV embeds a copy of the one it uses in personal.photo. */
+export interface SavedPhoto {
+  id: string
+  /** the printed 7:9 JPEG as a data URL */
+  data: string
+  createdAt: string
+}
+
 export interface SavedKey {
   id: string
   provider: ProviderType

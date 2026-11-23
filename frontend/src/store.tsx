@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, ApiError } from './api'
 import { emptyCV, exampleCV, normalizeCV } from './defaults'
 import { hasLocalAISettings, hasLocalCV, lastDoc, loadAISettings, loadCV, saveAISettings, saveCV } from './storage'
-import type { AIConfig, AISettings, CV, CvMeta, Item, ProviderInfo, ProviderSettings, ProviderType, SavedKey, Section, TemplateInfo } from './types'
+import type { AIConfig, AISettings, CV, CvMeta, Item, ProviderInfo, ProviderSettings, ProviderType, SavedKey, SavedPhoto, Section, TemplateInfo } from './types'
 
 export type Toast = { id: number; kind: 'info' | 'success' | 'error'; text: string }
 export type SaveState = 'saved' | 'saving' | 'error'
@@ -31,6 +31,9 @@ interface Store {
   aiConfig: AIConfig | null
   savedKeys: SavedKey[]
   setSavedKeys: (keys: SavedKey[]) => void
+  /** the account's photo library; null while loading or when the server can't keep one (browser-only mode) */
+  savedPhotos: SavedPhoto[] | null
+  setSavedPhotos: (photos: SavedPhoto[]) => void
   aiReady: boolean
   aiModalOpen: boolean
   openAISettings: (open?: boolean) => void
@@ -106,6 +109,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [ai, setAIState] = useState<AISettings>(loadAISettings)
   const [aiConfig, setAIConfig] = useState<AIConfig | null>(null)
   const [savedKeys, setSavedKeys] = useState<SavedKey[]>([])
+  const [savedPhotos, setSavedPhotos] = useState<SavedPhoto[] | null>(null)
   const [aiModalOpen, setAIModalOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [letterOpen, setLetterOpen] = useState(false)
@@ -208,6 +212,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setLibrary(list)
         loadIntoEditor(full.id, full.name, full.data)
         setStorageMode('server')
+        api.photos().then(setSavedPhotos).catch(() => undefined) // without it, uploads go straight into the CV
       } catch (e) {
         if (cancelled || (e instanceof ApiError && e.status === 401)) return // login screen takes over
         setStorageMode('local')
@@ -397,6 +402,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       aiConfig,
       savedKeys,
       setSavedKeys,
+      savedPhotos,
+      setSavedPhotos,
       aiReady,
       aiModalOpen,
       openAISettings: (open = true) => setAIModalOpen(open),
@@ -413,7 +420,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toast,
       dismissToast,
     }),
-    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, savedKeys, aiReady, aiModalOpen, importOpen, letterOpen, linkedinOpen, importCV, tourOpen, toasts, toast, dismissToast],
+    [cv, mutate, replaceCV, undo, historyLen, saveState, storageMode, library, docId, docName, openDoc, createDoc, renameDoc, deleteDoc, flushSave, templates, headingFor, ai, setAI, aiConfig, savedKeys, savedPhotos, aiReady, aiModalOpen, importOpen, letterOpen, linkedinOpen, importCV, tourOpen, toasts, toast, dismissToast],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

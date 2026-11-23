@@ -40,6 +40,10 @@ class _Base(BaseModel):
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
 
+# a data URL of a JPEG/PNG/WebP photo, or "" for none (also used by the photo library, photos.py)
+PHOTO_PATTERN = r"^(data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2})?$"
+
+
 class Personal(_Base):
     fullName: str = Field(default="", max_length=200)
     headline: str = Field(default="", max_length=300)
@@ -53,9 +57,11 @@ class Personal(_Base):
     nationality: str = Field(default="", max_length=200)
     dateOfBirth: str = Field(default="", max_length=50)
     workPermit: str = Field(default="", max_length=300)
+    # False keeps the work permit text in the editor but leaves it off this CV (and out of AI prompts)
+    showWorkPermit: bool = True
     drivingLicence: str = Field(default="", max_length=100)
     # Optional photo as a data URL (the editor sends a ~50 KB 7:9 JPEG). Printed top right in both layouts.
-    photo: str = Field(default="", max_length=1_500_000, pattern=r"^(data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2})?$")
+    photo: str = Field(default="", max_length=1_500_000, pattern=PHOTO_PATTERN)
 
 
 class Item(_Base):

@@ -1,8 +1,7 @@
-import { ChevronDown, ChevronRight, Crosshair, Gauge, Globe, IdCard, ImageUp, Mail, Plus, Trash2, UserRound } from 'lucide-react'
+import { ChevronDown, ChevronRight, Crosshair, Gauge, Globe, IdCard, Mail, Plus, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { jobKey, keywordMatch, PROFILE_EXAMPLE, siteOnly } from '../atsCheck'
 import { newSection } from '../defaults'
-import { photoFromFile } from '../photo'
 import { ADDABLE_ORDER, SECTION_TYPES } from '../sectionTypes'
 import { useStore } from '../store'
 import type { Personal, SectionType } from '../types'
@@ -10,9 +9,11 @@ import { useAI } from '../useAI'
 import { AutoTextArea, Field, TextInput } from './fields'
 import { JobReportView } from './JobReport'
 import { PhoneInput } from './PhoneInput'
+import { PhotoField } from './PhotoPicker'
 import { Spinner } from './ui'
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+type TextKey = { [K in keyof Personal]: Personal[K] extends string ? K : never }[keyof Personal]
 
 export function PersonalCard() {
   const { cv, mutate } = useStore()
@@ -21,7 +22,7 @@ export function PersonalCard() {
   useEffect(() => {
     if (cv.design.template === 'europass') setShowEU(true)
   }, [cv.design.template])
-  const set = (k: keyof Personal) => (v: string) => mutate((d) => void (d.personal[k] = v))
+  const set = (k: TextKey) => (v: string) => mutate((d) => void (d.personal[k] = v))
   // "LinkedIn" or "github.com" alone would link to the site's home page, so the CV leaves it out: say why
   const profileHint = (site: 'linkedin' | 'github', name: string) =>
     siteOnly(site, p[site]) ? (
@@ -64,9 +65,31 @@ export function PersonalCard() {
           <Field label="Website (optional)">
             <TextInput value={p.website} onChange={set('website')} placeholder="yourname.dev" />
           </Field>
-          <Field label="Work permit / relocation (optional)" span={2} hint="Printed under your contact details in both layouts: visa status, right to work, relocation readiness.">
-            <TextInput value={p.workPermit} onChange={set('workPermit')} placeholder="e.g. Requires visa sponsorship · Open to relocation to Germany" />
-          </Field>
+          <div className={`field span-2${p.showWorkPermit ? '' : ' is-off'}`}>
+            <div className="field-label-row">
+              <span className="field-label">Work permit / relocation (optional)</span>
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={p.showWorkPermit}
+                  onChange={(e) => mutate((d) => void (d.personal.showWorkPermit = e.target.checked))}
+                />
+                Show on this CV
+              </label>
+            </div>
+            <TextInput
+              value={p.workPermit}
+              onChange={set('workPermit')}
+              ariaLabel="Work permit / relocation"
+              placeholder="e.g. Requires visa sponsorship · Open to relocation to Germany"
+            />
+            <span className="field-hint">
+              {p.showWorkPermit
+                ? 'Printed under your contact details in both layouts: visa status, right to work, relocation readiness.'
+                : "Left off this CV and ignored by the AI helper. The text is kept, so you can switch it back on."}
+            </span>
+          </div>
           <PhotoField />
         </div>
         <button type="button" className="disclosure" onClick={() => setShowEU(!showEU)} aria-expanded={showEU}>
@@ -103,52 +126,6 @@ export function PersonalCard() {
         )}
       </div>
     </section>
-  )
-}
-
-/** Optional photo: printed top right in both layouts; cropped to passport shape before it's stored. */
-function PhotoField() {
-  const { cv, mutate, toast } = useStore()
-  const photo = cv.personal.photo
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [busy, setBusy] = useState(false)
-
-  const upload = async (file: File) => {
-    if (fileRef.current) fileRef.current.value = '' // let the same file be picked again
-    setBusy(true)
-    try {
-      const url = await photoFromFile(file)
-      mutate((d) => void (d.personal.photo = url))
-    } catch (e) {
-      toast((e as Error).message, 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="field span-2">
-      <span className="field-label">Photo (optional)</span>
-      <div className="photo-field">
-        <div className="photo-thumb">{photo ? <img src={photo} alt="Your CV photo" /> : <UserRound size={28} aria-hidden />}</div>
-        <div className="photo-actions">
-          <div className="input-with-btn">
-            <button type="button" className="btn sm" onClick={() => fileRef.current?.click()} disabled={busy}>
-              {busy ? <Spinner /> : <ImageUp size={14} />} {photo ? 'Change photo' : 'Upload photo'}
-            </button>
-            {photo && (
-              <button type="button" className="btn sm ghost" onClick={() => mutate((d) => void (d.personal.photo = ''))}>
-                <Trash2 size={14} /> Remove
-              </button>
-            )}
-          </div>
-          <span className="field-hint">
-            Printed at the top right of the CV, cropped to passport shape: use a head-and-shoulders photo.
-          </span>
-        </div>
-        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
-      </div>
-    </div>
   )
 }
 

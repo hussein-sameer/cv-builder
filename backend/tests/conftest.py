@@ -12,7 +12,7 @@ from app import auth, config, db
 from app.main import app
 
 SAMPLE = json.loads((Path(__file__).parent / "sample_cv.json").read_text())
-TABLES = ("ai_keys", "ai_usage", "sessions", "cvs", "users")
+TABLES = ("photos", "ai_keys", "ai_usage", "sessions", "cvs", "users")
 BACKENDS = ["sqlite"] + (["postgres"] if os.getenv("TEST_DATABASE_URL") else [])
 
 

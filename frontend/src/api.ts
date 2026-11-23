@@ -1,4 +1,4 @@
-import type { AIConfig, AiResult, AiTask, AuthConfig, CV, CvMeta, CvRecord, GenerateOptions, ProviderSettings, ProviderType, SavedKey, SessionUser, TemplateInfo } from './types'
+import type { AIConfig, AiResult, AiTask, AuthConfig, CV, CvMeta, CvRecord, GenerateOptions, ProviderSettings, ProviderType, SavedKey, SavedPhoto, SessionUser, TemplateInfo } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') ?? ''
 
@@ -83,6 +83,16 @@ export const api = {
   },
   async deleteCV(id: string): Promise<void> {
     await request('DELETE', `/api/cvs/${encodeURIComponent(id)}`)
+  },
+
+  // ---- saved photos (at most 3 per account)
+  photos: () => getJSON<SavedPhoto[]>('/api/photos'),
+  /** Save a photo; replaceIds are deleted in the same request to make room in a full library. */
+  async savePhoto(data: string, replaceIds: string[] = []): Promise<SavedPhoto> {
+    return (await post('/api/photos', { data, replaceIds })).json()
+  },
+  async deletePhoto(id: string): Promise<void> {
+    await request('DELETE', `/api/photos/${encodeURIComponent(id)}`)
   },
 
   // ---- meta / export / AI

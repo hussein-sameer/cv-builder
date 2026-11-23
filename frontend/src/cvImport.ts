@@ -205,7 +205,7 @@ export function parseCvText(text: string): CV {
   })
 
   const cv = normalizeCV({
-    personal,
+    personal: { ...personal, showWorkPermit: p.showWorkPermit !== false }, // a CV Builder export may hide it
     sections,
     design: coerceDesign(raw.design),
     // a CV Builder export's job report is left out: it's re-run, not trusted from a file

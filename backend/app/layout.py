@@ -397,6 +397,8 @@ def build_document(cv: CV) -> RenderDoc:
 
     details: list[tuple[str, str]] = []
     for key in spec.personal_details:
+        if key == "workPermit" and not p.showWorkPermit:
+            continue
         value = format_birth_date(p.dateOfBirth) if key == "dateOfBirth" else getattr(p, key)
         if value.strip():
             details.append((DETAIL_LABELS[key], _clean(value)))
